@@ -25,11 +25,10 @@ const NavBar: React.FC = () => {
   // Build navigation items based on user type
   let navItems = [];
 
-  // If user is a client with association, show only Business Data, Campaign Setup, and Project Overview
+  // If user is a client with association, show only Business Data and Project Overview
   if (user?.user_type === 'client' && user?.association) {
     navItems = [
       { path: '/business', label: 'Business Data', icon: Database },
-      { path: '/campaign-setup', label: 'Campaign Setup', icon: Target },
       { path: '/project-overview', label: 'Project Overview', icon: ClipboardList },
     ];
   } else {

@@ -15,6 +15,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import RouteProtector from './components/RouteProtector';
 import { ClientProvider } from './contexts/ClientContext';
 import { AuthProvider } from './contexts/AuthContext';
+import { MediaPlanProvider } from './contexts/MediaPlanContext';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -31,7 +32,8 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <ClientProvider>
-          <Router>
+          <MediaPlanProvider>
+            <Router>
             <ProtectedRoute>
               <div className="min-h-screen bg-gray-50">
                 <NavBar />
@@ -45,7 +47,11 @@ function App() {
                       </RouteProtector>
                     } />
                     <Route path="/business" element={<BusinessDataNew />} />
-                    <Route path="/campaign-setup" element={<CampaignSetup />} />
+                    <Route path="/campaign-setup" element={
+                      <RouteProtector allowedRoutes={['/business', '/project-overview']}>
+                        <CampaignSetup />
+                      </RouteProtector>
+                    } />
 
                     <Route path="/project-overview" element={<ProjectOverviewPage />} />
                     <Route path="/access" element={
@@ -62,7 +68,8 @@ function App() {
                 </main>
               </div>
             </ProtectedRoute>
-          </Router>
+            </Router>
+          </MediaPlanProvider>
         </ClientProvider>
       </AuthProvider>
     </QueryClientProvider>
