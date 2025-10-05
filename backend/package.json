@@ -1,0 +1,48 @@
+{
+  "name": "finance-dashboard-backend",
+  "version": "1.0.0",
+  "description": "Backend API for Finance Dashboard",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "migrate": "node src/migrations/run.js",
+    "test-db": "node test-db.js"
+  },
+  "dependencies": {
+    "archiver": "^5.3.1",
+    "axios": "^1.12.2",
+    "bcrypt": "^6.0.0",
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
+    "crypto-js": "^4.2.0",
+    "csv-parser": "^3.0.0",
+    "dotenv": "^17.2.3",
+    "express": "^4.18.2",
+    "express-rate-limit": "^8.1.0",
+    "fs-extra": "^11.1.1",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "moment": "^2.29.4",
+    "mongodb": "^6.20.0",
+    "multer": "^1.4.5-lts.1",
+    "node-forge": "^1.3.1",
+    "ollama": "^0.5.18",
+    "pg": "^8.11.0",
+    "sqlite3": "^5.1.7",
+    "uuid": "^9.0.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.24",
+    "@types/react-dom": "^18.3.7",
+    "nodemon": "^3.0.1"
+  },
+  "keywords": [
+    "finance",
+    "dashboard",
+    "api"
+  ],
+  "author": "",
+  "license": "MIT"
+}

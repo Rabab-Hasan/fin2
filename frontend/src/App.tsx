@@ -1,0 +1,72 @@
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import NavBar from './components/NavBar';
+import Home from './pages/Home';
+import BusinessDataNew from './pages/BusinessDataNew';
+import Labs from './pages/Labs';
+import ProjectOverviewPage from './pages/ProjectOverviewPage';
+import AccessPage from './pages/AccessPage';
+import CampaignSetup from './pages/CampaignSetup';
+import TikTokAuthCallback from './pages/TikTokAuthCallback';
+import MetaAuthCallback from './pages/MetaAuthCallback';
+
+import ProtectedRoute from './components/ProtectedRoute';
+import RouteProtector from './components/RouteProtector';
+import { ClientProvider } from './contexts/ClientContext';
+import { AuthProvider } from './contexts/AuthContext';
+
+// Create a client
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
+
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <ClientProvider>
+          <Router>
+            <ProtectedRoute>
+              <div className="min-h-screen bg-gray-50">
+                <NavBar />
+                <main>
+                  <Routes>
+                    <Route path="/tiktok-auth-callback" element={<TikTokAuthCallback />} />
+                    <Route path="/meta-auth-callback" element={<MetaAuthCallback />} />
+                    <Route path="/" element={
+                      <RouteProtector allowedRoutes={['/business']}>
+                        <Home />
+                      </RouteProtector>
+                    } />
+                    <Route path="/business" element={<BusinessDataNew />} />
+                    <Route path="/campaign-setup" element={<CampaignSetup />} />
+
+                    <Route path="/project-overview" element={<ProjectOverviewPage />} />
+                    <Route path="/access" element={
+                      <RouteProtector allowedRoutes={[]}>
+                        <AccessPage />
+                      </RouteProtector>
+                    } />
+                    <Route path="/labs" element={
+                      <RouteProtector allowedRoutes={[]}>
+                        <Labs />
+                      </RouteProtector>
+                    } />
+                  </Routes>
+                </main>
+              </div>
+            </ProtectedRoute>
+          </Router>
+        </ClientProvider>
+      </AuthProvider>
+    </QueryClientProvider>
+  );
+}
+
+export default App;
