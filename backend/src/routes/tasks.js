@@ -23,6 +23,7 @@ function buildTaskTree(tasks) {
       link: task.link,
       parentId: task.parent_id,
       clientId: task.client_id,
+      visibleToClient: task.visible_to_client === 1,
       subtasks: [],
       createdAt: task.created_at,
       updatedAt: task.updated_at
@@ -51,7 +52,7 @@ function buildTaskTree(tasks) {
 // GET /api/tasks - Get all tasks with optional filtering
 router.get('/', async (req, res) => {
   try {
-    const { status, assignee, search, clientId } = req.query;
+    const { status, assignee, search, clientId, userType } = req.query;
     let query = 'SELECT * FROM tasks';
     const conditions = [];
     const params = [];
@@ -62,6 +63,11 @@ router.get('/', async (req, res) => {
       params.push(clientId);
     } else {
       return res.status(400).json({ error: 'Client ID is required' });
+    }
+
+    // Filter by visibility for client users
+    if (userType === 'client') {
+      conditions.push('visible_to_client = 1');
     }
 
     if (status) {
@@ -132,6 +138,7 @@ router.get('/:id', async (req, res) => {
       link: task.link,
       parentId: task.parent_id,
       clientId: task.client_id,
+      visibleToClient: task.visible_to_client === 1,
       createdAt: task.created_at,
       updatedAt: task.updated_at
     };
@@ -156,7 +163,8 @@ router.post('/', async (req, res) => {
       actionLabsComments,
       link,
       parentId,
-      clientId
+      clientId,
+      visibleToClient = true
     } = req.body;
 
     if (!title || title.trim() === '') {
@@ -192,8 +200,8 @@ router.post('/', async (req, res) => {
       `INSERT INTO tasks (
         id, title, description, status, assignee, deadline, 
         client_comments, action_labs_comments, link, parent_id, client_id,
-        created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        visible_to_client, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         taskId,
         title.trim(),
@@ -206,6 +214,7 @@ router.post('/', async (req, res) => {
         link?.trim() || null,
         parentId || null,
         clientId,
+        visibleToClient ? 1 : 0,
         now,
         now
       ]
@@ -234,6 +243,7 @@ router.post('/', async (req, res) => {
       link: newTask.link,
       parentId: newTask.parent_id,
       clientId: newTask.client_id,
+      visibleToClient: newTask.visible_to_client === 1,
       subtasks: [],
       createdAt: newTask.created_at,
       updatedAt: newTask.updated_at
@@ -259,7 +269,8 @@ router.put('/:id', async (req, res) => {
       clientComments,
       actionLabsComments,
       link,
-      clientId
+      clientId,
+      visibleToClient
     } = req.body;
 
     if (!clientId) {
@@ -294,6 +305,7 @@ router.put('/:id', async (req, res) => {
         client_comments = COALESCE(?, client_comments),
         action_labs_comments = COALESCE(?, action_labs_comments),
         link = COALESCE(?, link),
+        visible_to_client = COALESCE(?, visible_to_client),
         updated_at = datetime('now')
       WHERE id = ?`,
       [
@@ -305,6 +317,7 @@ router.put('/:id', async (req, res) => {
         clientComments?.trim() || null,
         actionLabsComments?.trim() || null,
         link?.trim() || null,
+        visibleToClient !== undefined ? (visibleToClient ? 1 : 0) : null,
         id
       ]
     );
@@ -332,6 +345,7 @@ router.put('/:id', async (req, res) => {
       link: updatedTask.link,
       parentId: updatedTask.parent_id,
       clientId: updatedTask.client_id,
+      visibleToClient: updatedTask.visible_to_client === 1,
       createdAt: updatedTask.created_at,
       updatedAt: updatedTask.updated_at
     };
