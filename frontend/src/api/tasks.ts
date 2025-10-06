@@ -12,6 +12,7 @@ export interface Task {
   link?: string;
   parentId?: string;
   clientId?: string;
+  visibleToClient?: boolean;
   subtasks?: Task[];
   createdAt: string;
   updatedAt: string;
@@ -22,6 +23,7 @@ export interface TaskFilters {
   assignee?: string;
   search?: string;
   clientId?: string;
+  userType?: string;
 }
 
 export interface CreateTaskData {
@@ -35,6 +37,7 @@ export interface CreateTaskData {
   link?: string;
   parentId?: string;
   clientId?: string;
+  visibleToClient?: boolean;
 }
 
 export interface UpdateTaskData {
@@ -47,6 +50,7 @@ export interface UpdateTaskData {
   actionLabsComments?: string;
   link?: string;
   clientId?: string;
+  visibleToClient?: boolean;
 }
 
 const tasksApi = {
@@ -58,6 +62,7 @@ const tasksApi = {
     if (filters.assignee) params.append('assignee', filters.assignee);
     if (filters.search) params.append('search', filters.search);
     if (filters.clientId) params.append('clientId', filters.clientId);
+    if (filters.userType) params.append('userType', filters.userType);
     
     const url = params.toString() ? `${BASE_URL}?${params}` : BASE_URL;
     

@@ -2,11 +2,14 @@
 import React from 'react';
 import MonthlyComparison from '../components/MonthlyComparison';
 import DayPerformanceAnalysis from '../components/DayPerformanceAnalysis';
+import ReadOnlyMediaPlan from '../components/ReadOnlyMediaPlan';
 import { useClient } from '../contexts/ClientContext';
+import { useMediaPlan } from '../contexts/MediaPlanContext';
 import Card from '../components/Card';
 
 const BusinessDataNew: React.FC = () => {
   const { selectedClient } = useClient();
+  const { cpcTableShownOnBusinessData, cpmTableShownOnBusinessData } = useMediaPlan();
 
   if (!selectedClient) {
     return (
@@ -32,6 +35,17 @@ const BusinessDataNew: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+      {/* Media Plan Overview Section */}
+      {(cpcTableShownOnBusinessData || cpmTableShownOnBusinessData) && (
+        <div>
+          <div className="mb-6">
+            <h1 className="text-2xl font-bold text-gray-900">📊 Media Plan Overview</h1>
+            <p className="text-gray-600 mt-1">Campaign data overview for {selectedClient.name}</p>
+          </div>
+          <ReadOnlyMediaPlan />
+        </div>
+      )}
+
       {/* Monthly Comparison Section */}
       <div>
         <div className="mb-6">

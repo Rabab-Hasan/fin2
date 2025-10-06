@@ -15,7 +15,12 @@ const Home: React.FC = () => {
   
   const { data: stats, isLoading } = useQuery({
     queryKey: ['stats', selectedClient?.id],
-    queryFn: () => selectedClient ? reportsApi.getStats(selectedClient.id) : Promise.resolve(null),
+    queryFn: () => {
+      if (!selectedClient || !reportsApi.getStats) {
+        return Promise.resolve(null);
+      }
+      return reportsApi.getStats(selectedClient.id);
+    },
     enabled: !!selectedClient,
   });
 

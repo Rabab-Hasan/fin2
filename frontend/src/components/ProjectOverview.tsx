@@ -15,10 +15,14 @@ import {
   AlertCircle,
   Loader2,
   Save,
-  X
+  X,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import Card from './Card';
+import CampaignWizard from './CampaignWizard';
 import tasksApi, { Task as TaskType, CreateTaskData, UpdateTaskData } from '../api/tasks';
+import campaignsApi, { Campaign } from '../api/campaigns';
 import { useClient } from '../contexts/ClientContext';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -34,6 +38,7 @@ interface Task {
   actionLabsComments?: string;
   link?: string;
   parentId?: string; // null for main tasks, task ID for subtasks
+  visibleToClient?: boolean;
   subtasks?: Task[];
   createdAt: string;
   updatedAt: string;
@@ -97,8 +102,12 @@ const ProjectOverview: React.FC = () => {
     deadline: '',
     clientComments: '',
     actionLabsComments: '',
-    link: ''
+    link: '',
+    visibleToClient: true
   });
+  const [showCampaignWizard, setShowCampaignWizard] = useState(false);
+  const [expandedCampaigns, setExpandedCampaigns] = useState<Set<string>>(new Set());
+  const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
 
   const queryClient = useQueryClient();
 
@@ -108,7 +117,17 @@ const ProjectOverview: React.FC = () => {
   // Fetch tasks with filters
   const { data: tasksData, isLoading, error } = useQuery({
     queryKey: ['tasks', selectedClient?.id],
-    queryFn: () => selectedClient ? tasksApi.getTasks({ clientId: selectedClient.id }) : Promise.resolve({ tasks: [] }),
+    queryFn: () => selectedClient ? tasksApi.getTasks({ 
+      clientId: selectedClient.id,
+      userType: user?.user_type
+    }) : Promise.resolve({ tasks: [] }),
+    enabled: !!selectedClient,
+  });
+
+  // Fetch campaigns
+  const { data: campaignsData, isLoading: isLoadingCampaigns } = useQuery({
+    queryKey: ['campaigns', selectedClient?.id],
+    queryFn: () => selectedClient ? campaignsApi.getCampaigns({ clientId: selectedClient.id }) : Promise.resolve([]),
     enabled: !!selectedClient,
   });
 
@@ -178,7 +197,8 @@ const ProjectOverview: React.FC = () => {
       deadline: '',
       clientComments: '',
       actionLabsComments: '',
-      link: ''
+      link: '',
+      visibleToClient: true
     });
     setIsAddingTask(false);
     setAddingSubtaskTo(null);
@@ -229,6 +249,15 @@ const ProjectOverview: React.FC = () => {
     if (window.confirm(`Are you sure you want to delete "${taskTitle}"? This will also delete all subtasks.`)) {
       deleteTaskMutation.mutate(taskId);
     }
+  };
+
+  const handleToggleVisibility = (task: Task) => {
+    const updatedVisibility = !task.visibleToClient;
+    const taskData: UpdateTaskData = {
+      visibleToClient: updatedVisibility,
+      clientId: selectedClient?.id
+    };
+    updateTaskMutation.mutate({ id: task.id, taskData });
   };
 
   const getStatusIcon = (status: Task['status']) => {
@@ -359,6 +388,19 @@ const ProjectOverview: React.FC = () => {
               </button>
               {!isClientUser && (
                 <button
+                  onClick={() => handleToggleVisibility(task)}
+                  className={`p-1 rounded ${
+                    task.visibleToClient 
+                      ? 'text-green-600 hover:bg-green-50' 
+                      : 'text-gray-400 hover:bg-gray-50'
+                  }`}
+                  title={task.visibleToClient ? "Hide from client" : "Show to client"}
+                >
+                  {task.visibleToClient ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                </button>
+              )}
+              {!isClientUser && (
+                <button
                   onClick={() => handleDeleteTask(task.id, task.title)}
                   className="p-1 text-red-600 hover:bg-red-50 rounded"
                   title="Delete Task"
@@ -414,15 +456,120 @@ const ProjectOverview: React.FC = () => {
                 </p>
               </div>
               {!isClientUser && (
-                <button
-                  onClick={() => setIsAddingTask(true)}
-                  className="btn-primary flex items-center gap-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  Add Task
-                </button>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowCampaignWizard(true)}
+                    className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-all shadow-md hover:shadow-lg"
+                  >
+                    <Plus className="w-4 h-4" />
+                    New Campaign
+                  </button>
+                  <button
+                    onClick={() => setIsAddingTask(true)}
+                    className="btn-primary flex items-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add Task
+                  </button>
+                </div>
               )}
             </div>
+
+        {/* Campaigns Section */}
+        {campaignsData && campaignsData.length > 0 && (
+          <div className="mb-8">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Campaigns</h3>
+            <div className="space-y-4">
+              {campaignsData.map((campaign) => (
+                <Card key={campaign.id} className="p-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <button
+                          onClick={() => {
+                            const expanded = new Set(expandedCampaigns);
+                            if (expanded.has(campaign.id)) {
+                              expanded.delete(campaign.id);
+                            } else {
+                              expanded.add(campaign.id);
+                            }
+                            setExpandedCampaigns(expanded);
+                          }}
+                          className="text-gray-400 hover:text-gray-600"
+                        >
+                          {expandedCampaigns.has(campaign.id) ? (
+                            <ChevronDown className="w-4 h-4" />
+                          ) : (
+                            <ChevronRight className="w-4 h-4" />
+                          )}
+                        </button>
+                        <h4 className="text-lg font-medium text-gray-900">{campaign.name}</h4>
+                        <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+                          {campaign.type.replace('-', ' ')}
+                        </span>
+                        {campaign.status && (
+                          <span className={`px-2 py-1 text-xs rounded-full ${
+                            campaign.status === 'active' ? 'bg-green-100 text-green-800' :
+                            campaign.status === 'draft' ? 'bg-gray-100 text-gray-800' :
+                            campaign.status === 'paused' ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-purple-100 text-purple-800'
+                          }`}>
+                            {campaign.status}
+                          </span>
+                        )}
+                      </div>
+                      {expandedCampaigns.has(campaign.id) && (
+                        <div className="ml-6 space-y-3">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                            <div><span className="font-medium">Objective:</span> {campaign.objective}</div>
+                            <div><span className="font-medium">Budget:</span> ${campaign.budget?.toLocaleString()}</div>
+                            <div><span className="font-medium">Product:</span> {campaign.product}</div>
+                            <div><span className="font-medium">Activities:</span> {campaign.activities?.join(', ')}</div>
+                          </div>
+                          <div className="text-sm">
+                            <span className="font-medium">Concept:</span> {campaign.concept}
+                          </div>
+                          <div className="text-sm">
+                            <span className="font-medium">Narrative:</span> {campaign.narrative}
+                          </div>
+                          {campaign.tagline && (
+                            <div className="text-sm">
+                              <span className="font-medium">Tagline:</span> "{campaign.tagline}"
+                            </div>
+                          )}
+                          
+                          {/* Campaign Tasks Section */}
+                          <div className="mt-4 pt-4 border-t">
+                            <div className="flex items-center justify-between mb-3">
+                              <h5 className="font-medium text-gray-900">Campaign Tasks</h5>
+                              {!isClientUser && (
+                                <button
+                                  onClick={() => {
+                                    setSelectedCampaign(campaign);
+                                    setIsAddingTask(true);
+                                  }}
+                                  className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                                >
+                                  <Plus className="w-3 h-3" />
+                                  Add Task
+                                </button>
+                              )}
+                            </div>
+                            <CampaignTasks 
+                              campaignId={campaign.id} 
+                              clientId={selectedClient?.id || ''} 
+                              isClientUser={!!isClientUser}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Status Filter Bar */}
         <div className="flex gap-2 mb-4">
@@ -745,6 +892,376 @@ const ProjectOverview: React.FC = () => {
         </div>
       )}
         </>
+      )}
+      
+      {/* Campaign Creation Wizard */}
+      <CampaignWizard
+        isOpen={showCampaignWizard}
+        onClose={() => setShowCampaignWizard(false)}
+        onSuccess={(campaign) => {
+          console.log('Campaign created successfully:', campaign);
+          // Refetch both campaigns and tasks to show newly created data
+          queryClient.invalidateQueries({ queryKey: ['campaigns', selectedClient?.id] });
+          queryClient.invalidateQueries({ queryKey: ['tasks', selectedClient?.id] });
+          setShowCampaignWizard(false);
+        }}
+      />
+    </div>
+  );
+};
+
+// Campaign Tasks Component
+interface CampaignTasksProps {
+  campaignId: string;
+  clientId: string;
+  isClientUser: boolean;
+}
+
+const CampaignTasks: React.FC<CampaignTasksProps> = ({ campaignId, clientId, isClientUser }) => {
+  const [isAddingTask, setIsAddingTask] = useState(false);
+  const [addingSubtaskTo, setAddingSubtaskTo] = useState<string | null>(null);
+  const [editingTask, setEditingTask] = useState<any | null>(null);
+  const [newTaskData, setNewTaskData] = useState({
+    title: '',
+    description: '',
+    status: 'todo' as const,
+    assignee: '',
+    deadline: '',
+    clientComments: '',
+    actionLabsComments: '',
+    link: '',
+    visibleToClient: true
+  });
+
+  const queryClient = useQueryClient();
+
+  const { data: campaignTasksData, isLoading: isLoadingTasks } = useQuery({
+    queryKey: ['campaignTasks', campaignId, clientId],
+    queryFn: () => campaignsApi.getCampaignTasks(campaignId, clientId),
+    enabled: !!campaignId && !!clientId,
+  });
+
+  // Create campaign task mutation
+  const createTaskMutation = useMutation({
+    mutationFn: async (taskData: any) => {
+      const taskId = `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const currentTime = new Date().toISOString();
+      
+      // Create the task
+      const response = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: taskId,
+          title: taskData.title,
+          description: taskData.description,
+          status: taskData.status,
+          assignee: taskData.assignee,
+          deadline: taskData.deadline,
+          clientComments: taskData.clientComments,
+          actionLabsComments: taskData.actionLabsComments,
+          link: taskData.link,
+          parentId: addingSubtaskTo,
+          clientId: clientId,
+          visibleToClient: taskData.visibleToClient,
+          createdAt: currentTime,
+          updatedAt: currentTime
+        })
+      });
+
+      if (!response.ok) throw new Error('Failed to create task');
+
+      // Link task to campaign
+      const linkResponse = await fetch('/api/campaigns/tasks/link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaignId: campaignId,
+          taskId: taskId,
+          activityType: 'custom'
+        })
+      });
+
+      if (!linkResponse.ok) throw new Error('Failed to link task to campaign');
+
+      return { taskId, ...taskData };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['campaignTasks', campaignId, clientId] });
+      resetTaskForm();
+    }
+  });
+
+  const resetTaskForm = () => {
+    setNewTaskData({
+      title: '',
+      description: '',
+      status: 'todo' as const,
+      assignee: '',
+      deadline: '',
+      clientComments: '',
+      actionLabsComments: '',
+      link: '',
+      visibleToClient: true
+    });
+    setIsAddingTask(false);
+    setAddingSubtaskTo(null);
+  };
+
+  const handleCreateTask = () => {
+    if (!newTaskData.title.trim()) return;
+    createTaskMutation.mutate(newTaskData);
+  };
+
+  if (isLoadingTasks) {
+    return (
+      <div className="flex items-center justify-center py-4">
+        <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+        <span className="ml-2 text-sm text-gray-500">Loading campaign tasks...</span>
+      </div>
+    );
+  }
+
+  const tasks = campaignTasksData?.tasks || [];
+
+  return (
+    <div className="space-y-3">
+      {/* Add Task Button */}
+      {!isClientUser && !isAddingTask && (
+        <button
+          onClick={() => setIsAddingTask(true)}
+          className="w-full p-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 hover:border-blue-400 hover:text-blue-600 transition-colors flex items-center justify-center gap-2"
+        >
+          <Plus className="w-4 h-4" />
+          Add Campaign Task
+        </button>
+      )}
+
+      {/* Add Task Form */}
+      {!isClientUser && isAddingTask && (
+        <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+          <h6 className="font-medium text-gray-900 mb-3">Add New Campaign Task</h6>
+          
+          <div className="space-y-3">
+            <div>
+              <input
+                type="text"
+                placeholder="Task title..."
+                value={newTaskData.title}
+                onChange={(e) => setNewTaskData({ ...newTaskData, title: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                autoFocus
+              />
+            </div>
+            
+            <div>
+              <textarea
+                placeholder="Description (optional)..."
+                value={newTaskData.description}
+                onChange={(e) => setNewTaskData({ ...newTaskData, description: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                rows={2}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div>
+                <select
+                  value={newTaskData.status}
+                  onChange={(e) => setNewTaskData({ ...newTaskData, status: e.target.value as any })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="todo">To Do</option>
+                  <option value="in-progress">In Progress</option>
+                  <option value="pending">Pending</option>
+                  <option value="completed">Completed</option>
+                </select>
+              </div>
+
+              <div>
+                <input
+                  type="text"
+                  placeholder="Assignee"
+                  value={newTaskData.assignee}
+                  onChange={(e) => setNewTaskData({ ...newTaskData, assignee: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <input
+                  type="date"
+                  value={newTaskData.deadline}
+                  onChange={(e) => setNewTaskData({ ...newTaskData, deadline: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            <div>
+              <input
+                type="url"
+                placeholder="Link (optional)"
+                value={newTaskData.link}
+                onChange={(e) => setNewTaskData({ ...newTaskData, link: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="campaign-task-visible"
+                checked={newTaskData.visibleToClient}
+                onChange={(e) => setNewTaskData({ ...newTaskData, visibleToClient: e.target.checked })}
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <label htmlFor="campaign-task-visible" className="text-sm text-gray-700">
+                Visible to client
+              </label>
+            </div>
+
+            <div className="flex items-center space-x-2 pt-2">
+              <button
+                onClick={handleCreateTask}
+                disabled={!newTaskData.title.trim() || createTaskMutation.isPending}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {createTaskMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Plus className="w-4 h-4" />
+                )}
+                {createTaskMutation.isPending ? 'Creating...' : 'Create Task'}
+              </button>
+              <button
+                onClick={resetTaskForm}
+                className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Existing Tasks */}
+      {tasks.length === 0 && !isAddingTask ? (
+        <div className="text-center py-6 text-gray-500">
+          <p className="text-sm">No tasks created for this campaign yet.</p>
+        </div>
+      ) : (
+        tasks.map((task: any) => (
+          <div key={task.id} className="bg-gray-50 rounded-lg p-3 border">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <div className="flex items-center space-x-2">
+                  <h6 className="font-medium text-gray-900 text-sm">{task.title}</h6>
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    task.status === 'completed' ? 'bg-green-100 text-green-800' :
+                    task.status === 'in-progress' ? 'bg-blue-100 text-blue-800' :
+                    task.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-gray-100 text-gray-800'
+                  }`}>
+                    {task.status.replace('-', ' ')}
+                  </span>
+                  {task.activityType && (
+                    <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full">
+                      {task.activityType}
+                    </span>
+                  )}
+                  {!task.visibleToClient && (
+                    <div title="Hidden from client">
+                      <EyeOff className="w-3 h-3 text-gray-400" />
+                    </div>
+                  )}
+                </div>
+                {task.description && (
+                  <p className="text-sm text-gray-600 mt-1">{task.description}</p>
+                )}
+                <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
+                  {task.assignee && (
+                    <div className="flex items-center space-x-1">
+                      <User className="w-3 h-3" />
+                      <span>{task.assignee}</span>
+                    </div>
+                  )}
+                  {task.deadline && (
+                    <div className="flex items-center space-x-1">
+                      <Calendar className="w-3 h-3" />
+                      <span>{new Date(task.deadline).toLocaleDateString()}</span>
+                    </div>
+                  )}
+                  {task.link && (
+                    <div className="flex items-center space-x-1">
+                      <LinkIcon className="w-3 h-3" />
+                      <a href={task.link} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
+                        Link
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </div>
+              {!isClientUser && (
+                <div className="flex items-center space-x-1">
+                  <button 
+                    onClick={() => setAddingSubtaskTo(task.id)}
+                    className="p-1 text-gray-400 hover:text-green-600 rounded"
+                    title="Add subtask"
+                  >
+                    <Plus className="w-3 h-3" />
+                  </button>
+                  <button className="p-1 text-gray-400 hover:text-blue-600 rounded">
+                    <Edit className="w-3 h-3" />
+                  </button>
+                  <button className="p-1 text-gray-400 hover:text-red-600 rounded">
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Subtask Form */}
+            {!isClientUser && addingSubtaskTo === task.id && (
+              <div className="mt-3 ml-4 bg-white rounded-lg p-3 border border-gray-200">
+                <h6 className="font-medium text-gray-700 mb-2 text-sm">Add Subtask</h6>
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    placeholder="Subtask title..."
+                    value={newTaskData.title}
+                    onChange={(e) => setNewTaskData({ ...newTaskData, title: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    autoFocus
+                  />
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={handleCreateTask}
+                      disabled={!newTaskData.title.trim() || createTaskMutation.isPending}
+                      className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700 disabled:opacity-50 flex items-center gap-1"
+                    >
+                      {createTaskMutation.isPending ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <Plus className="w-3 h-3" />
+                      )}
+                      Add
+                    </button>
+                    <button
+                      onClick={() => {
+                        setAddingSubtaskTo(null);
+                        resetTaskForm();
+                      }}
+                      className="px-3 py-1 text-gray-600 border border-gray-300 rounded text-sm hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        ))
       )}
     </div>
   );

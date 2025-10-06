@@ -8,13 +8,14 @@ import Card from '../components/Card';
 import StrategyViewInterface from '../components/StrategyViewInterface';
 import ContentManagement from '../components/ContentManagement';
 import SocialMediaDashboard from '../components/SocialMediaDashboard';
+import MediaPlan from '../components/MediaPlan';
 import { useClient } from '../contexts/ClientContext';
 import { tiktokApi } from '../api/tiktok';
 import { metaApi } from '../api/meta';
 
 const Labs: React.FC = () => {
   const { selectedClient } = useClient();
-  const [activeTab, setActiveTab] = useState<'data' | 'strategy' | 'content' | 'social'>('data');
+  const [activeTab, setActiveTab] = useState<'data' | 'strategy' | 'content' | 'social' | 'media'>('data');
   const [selectedMonth, setSelectedMonth] = useState('');
   const [tiktokConnected, setTiktokConnected] = useState(false);
   const [metaConnected, setMetaConnected] = useState(false);
@@ -163,6 +164,16 @@ const Labs: React.FC = () => {
               >
                 Social Media
               </button>
+              <button
+                onClick={() => setActiveTab('media')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'media'
+                    ? 'border-primary-500 text-primary-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Media Plan
+              </button>
             </nav>
           </div>
 
@@ -294,6 +305,13 @@ const Labs: React.FC = () => {
                   </Card>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Media Plan Tab */}
+          {activeTab === 'media' && (
+            <div className="space-y-6">
+              <MediaPlan />
             </div>
           )}
         </>
