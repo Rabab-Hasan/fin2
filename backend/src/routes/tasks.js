@@ -53,13 +53,15 @@ function buildTaskTree(tasks) {
 router.get('/', async (req, res) => {
   try {
     const { status, assignee, search, clientId, userType } = req.query;
-    let query = 'SELECT * FROM tasks';
+    let query = `SELECT t.* FROM tasks t 
+                 LEFT JOIN campaign_tasks ct ON t.id = ct.task_id 
+                 WHERE ct.task_id IS NULL`; // Exclude campaign tasks
     const conditions = [];
     const params = [];
 
     // Always filter by client_id
     if (clientId) {
-      conditions.push('client_id = ?');
+      conditions.push('t.client_id = ?');
       params.push(clientId);
     } else {
       return res.status(400).json({ error: 'Client ID is required' });
@@ -67,29 +69,29 @@ router.get('/', async (req, res) => {
 
     // Filter by visibility for client users
     if (userType === 'client') {
-      conditions.push('visible_to_client = 1');
+      conditions.push('t.visible_to_client = 1');
     }
 
     if (status) {
-      conditions.push('status = ?');
+      conditions.push('t.status = ?');
       params.push(status);
     }
 
     if (assignee) {
-      conditions.push('assignee LIKE ?');
+      conditions.push('t.assignee LIKE ?');
       params.push(`%${assignee}%`);
     }
 
     if (search) {
-      conditions.push('(title LIKE ? OR description LIKE ?)');
+      conditions.push('(t.title LIKE ? OR t.description LIKE ?)');
       params.push(`%${search}%`, `%${search}%`);
     }
 
     if (conditions.length > 0) {
-      query += ' WHERE ' + conditions.join(' AND ');
+      query += ' AND ' + conditions.join(' AND ');
     }
 
-    query += ' ORDER BY created_at DESC';
+    query += ' ORDER BY t.created_at DESC';
 
     const pool = await db.connect();
     const result = await pool.query(query, params);

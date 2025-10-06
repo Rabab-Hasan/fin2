@@ -1,370 +1,704 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../database-sqlite');
-const path = require('path');
+const pool = require('../database');
+const { getDb } = require('../database-mongo');
+const { ObjectId } = require('mongodb');
 
-// Create campaigns table if it doesn't exist
-const createCampaignsTable = () => {
-  const createTableSQL = `
-    CREATE TABLE IF NOT EXISTS campaigns (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      type TEXT NOT NULL,
-      budget DECIMAL(10,2) NOT NULL,
-      product TEXT NOT NULL,
-      objective TEXT NOT NULL,
-      narrative TEXT NOT NULL,
-      concept TEXT NOT NULL,
-      tagline TEXT NOT NULL,
-      hero_artwork_path TEXT,
-      manager_id TEXT NOT NULL,
-      manager_name TEXT NOT NULL,
-      activities TEXT NOT NULL, -- JSON string of activities array
-      requires_internal_approval BOOLEAN DEFAULT 0,
-      requires_client_approval BOOLEAN DEFAULT 0,
-      ai_validated BOOLEAN DEFAULT 0,
-      ai_score INTEGER,
-      ai_suggestions TEXT, -- JSON string of suggestions array
-      client_id TEXT NOT NULL,
-      status TEXT DEFAULT 'draft', -- draft, active, paused, completed
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-  `;
-  
-  try {
-    db.exec(createTableSQL);
-    console.log('Campaigns table created or verified successfully');
-  } catch (error) {
-    console.error('Error creating campaigns table:', error);
-  }
+// Activity task templates - auto-generated tasks based on selected activities
+const ACTIVITY_TASK_TEMPLATES = {
+  'video_ads': [
+    {
+      title: 'Video Concept Development',
+      description: 'Develop creative concept and storyboard for video advertisement',
+      priority: 'high',
+      estimatedHours: 8,
+      subtasks: [
+        'Create initial concept brief',
+        'Develop storyboard',
+        'Script writing',
+        'Get concept approval'
+      ]
+    },
+    {
+      title: 'Video Production',
+      description: 'Coordinate video shoot and production',
+      priority: 'high',
+      estimatedHours: 16,
+      subtasks: [
+        'Location scouting',
+        'Talent casting',
+        'Equipment setup',
+        'Video shoot execution',
+        'Post-production editing'
+      ]
+    }
+  ],
+  'photoshoot': [
+    {
+      title: 'Photo Concept & Planning',
+      description: 'Plan photoshoot concept, styling, and logistics',
+      priority: 'medium',
+      estimatedHours: 6,
+      subtasks: [
+        'Define photo concept',
+        'Location booking',
+        'Model/talent selection',
+        'Props and styling preparation'
+      ]
+    },
+    {
+      title: 'Photo Execution',
+      description: 'Execute photoshoot and image processing',
+      priority: 'medium',
+      estimatedHours: 8,
+      subtasks: [
+        'Setup and lighting',
+        'Photo session',
+        'Image selection',
+        'Photo editing and retouching'
+      ]
+    }
+  ],
+  'events': [
+    {
+      title: 'Event Planning',
+      description: 'Plan and organize marketing event',
+      priority: 'high',
+      estimatedHours: 20,
+      subtasks: [
+        'Venue selection and booking',
+        'Guest list management',
+        'Catering arrangements',
+        'AV equipment setup',
+        'Event timeline creation'
+      ]
+    }
+  ],
+  'influencers': [
+    {
+      title: 'Influencer Campaign Management',
+      description: 'Manage influencer partnerships and content',
+      priority: 'medium',
+      estimatedHours: 12,
+      subtasks: [
+        'Influencer research and outreach',
+        'Contract negotiations',
+        'Content brief creation',
+        'Performance tracking and reporting'
+      ]
+    }
+  ],
+  'outdoor': [
+    {
+      title: 'Outdoor Advertising Campaign',
+      description: 'Plan and execute outdoor advertising placement',
+      priority: 'medium',
+      estimatedHours: 10,
+      subtasks: [
+        'Location analysis and selection',
+        'Design outdoor creative',
+        'Permit acquisition',
+        'Installation coordination'
+      ]
+    }
+  ],
+  'radio': [
+    {
+      title: 'Radio Campaign Production',
+      description: 'Create and manage radio advertising campaign',
+      priority: 'medium',
+      estimatedHours: 8,
+      subtasks: [
+        'Radio script writing',
+        'Voice talent selection',
+        'Audio recording and editing',
+        'Station booking and scheduling'
+      ]
+    }
+  ],
+  'pr': [
+    {
+      title: 'Public Relations Campaign',
+      description: 'Manage PR strategy and media relations',
+      priority: 'medium',
+      estimatedHours: 15,
+      subtasks: [
+        'Press release creation',
+        'Media list compilation',
+        'Press kit preparation',
+        'Media outreach and follow-up'
+      ]
+    }
+  ],
+  'sponsorships': [
+    {
+      title: 'Sponsorship Management',
+      description: 'Manage sponsorship partnerships and activations',
+      priority: 'medium',
+      estimatedHours: 12,
+      subtasks: [
+        'Sponsorship opportunity research',
+        'Partnership negotiations',
+        'Activation planning',
+        'ROI measurement and reporting'
+      ]
+    }
+  ]
 };
 
-// Initialize table
-createCampaignsTable();
+// AI validation function (placeholder - would integrate with actual AI service)
+async function validateCampaignData(campaignData) {
+  // This would integrate with an AI service like OpenAI, Claude, etc.
+  // For now, we'll do basic validation with intelligent checks
+  const validation = {
+    isValid: true,
+    feedback: '',
+    suggestions: [],
+    score: 0
+  };
+
+  let score = 0;
+
+  // Basic validation checks
+  if (!campaignData.name || campaignData.name.length < 3) {
+    validation.isValid = false;
+    validation.feedback += 'Campaign name must be at least 3 characters long. ';
+  } else {
+    score += 15;
+  }
+
+  if (!campaignData.objective || campaignData.objective.length < 10) {
+    validation.isValid = false;
+    validation.feedback += 'Campaign objective needs more detail (minimum 10 characters). ';
+  } else {
+    score += 20;
+    if (campaignData.objective.length > 50) score += 5; // Bonus for detailed objective
+  }
+
+  if (!campaignData.activities || campaignData.activities.length === 0) {
+    validation.isValid = false;
+    validation.feedback += 'At least one marketing activity must be selected. ';
+  } else {
+    score += 20;
+    if (campaignData.activities.length > 2) score += 10; // Bonus for diverse activities
+  }
+
+  if (campaignData.budget) {
+    if (campaignData.budget < 100) {
+      validation.suggestions.push('Consider if the budget is sufficient for the selected activities.');
+    } else {
+      score += 15;
+    }
+  }
+
+  if (campaignData.narrative && campaignData.narrative.length > 20) {
+    score += 10;
+  }
+
+  if (campaignData.concept && campaignData.concept.length > 20) {
+    score += 10;
+  }
+
+  if (campaignData.tagline && campaignData.tagline.length > 5) {
+    score += 10;
+  }
+
+  validation.score = Math.min(score, 100);
+
+  // Mock AI suggestions based on score
+  if (validation.isValid) {
+    if (validation.score >= 90) {
+      validation.feedback = 'Excellent campaign strategy! Well-structured with clear objectives and comprehensive activity selection.';
+    } else if (validation.score >= 70) {
+      validation.feedback = 'Good campaign foundation. Consider adding more detail to narrative and concept sections.';
+      validation.suggestions.push('Consider expanding the campaign narrative to better tell your brand story.');
+    } else {
+      validation.feedback = 'Campaign strategy needs improvement. Add more details and consider additional activities.';
+      validation.suggestions.push('Expand your marketing mix with complementary activities.');
+      validation.suggestions.push('Provide more detailed objective and success metrics.');
+    }
+
+    validation.suggestions.push('Consider adding performance metrics to track campaign success.');
+    
+    // Activity-specific suggestions
+    if (campaignData.activities.includes('video_ads') && campaignData.activities.includes('influencers')) {
+      validation.suggestions.push('Great synergy! Video content can be repurposed for influencer partnerships.');
+    }
+  }
+
+  return validation;
+}
+
+// Create auto-generated tasks for campaign
+async function createCampaignTasks(campaignId, activities, clientId, createdBy) {
+  const client = await pool.connect();
+  const createdTasks = [];
+
+  try {
+    for (const activity of activities) {
+      const taskTemplates = ACTIVITY_TASK_TEMPLATES[activity] || [];
+      
+      for (const template of taskTemplates) {
+        // Create main task using correct schema
+        const taskId = `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const currentTime = new Date().toISOString();
+        
+        await client.query(`
+          INSERT INTO tasks (
+            id, title, description, status, assignee, deadline,
+            client_comments, action_labs_comments, link, parent_id, client_id,
+            visible_to_client, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `, [
+          taskId,
+          template.title,
+          template.description,
+          'todo', // default status
+          null, // no assignee initially
+          null, // no deadline initially
+          null, // no client comments
+          `Campaign Task - ${activity} - Priority: ${template.priority}`, // action labs comments
+          null, // no link initially
+          null, // no parent task
+          clientId,
+          1, // visible to client by default
+          currentTime,
+          currentTime
+        ]);
+
+        // Link task to campaign using the generated taskId
+        await client.query(`
+          INSERT INTO campaign_tasks (campaign_id, task_id, activity_type)
+          VALUES (?, ?, ?)
+        `, [campaignId, taskId, activity]);
+
+        // Create subtasks if they exist
+        if (template.subtasks && template.subtasks.length > 0) {
+          for (const subtaskTitle of template.subtasks) {
+            const subtaskResult = await client.query(`
+              INSERT INTO tasks (
+                title, description, priority, parent_task_id,
+                client_id, created_by, visible_to_client, category
+              ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+              RETURNING id
+            `, [
+              subtaskTitle,
+              `Subtask of ${template.title}`,
+              'medium',
+              taskId,
+              clientId,
+              createdBy,
+              1,
+              activity
+            ]);
+
+            // Link subtask to campaign as well
+            await client.query(`
+              INSERT INTO campaign_tasks (campaign_id, task_id, activity_type)
+              VALUES ($1, $2, $3)
+            `, [campaignId, subtaskResult.rows[0].id, activity]);
+          }
+        }
+
+        createdTasks.push({
+          id: taskId,
+          title: template.title,
+          activity: activity
+        });
+      }
+    }
+
+    client.release();
+    return createdTasks;
+  } catch (error) {
+    client.release();
+    throw error;
+  }
+}
 
 // GET /api/campaigns - Get all campaigns for a client
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   try {
-    const { clientId } = req.query;
+    const { client_id } = req.query;
     
-    if (!clientId) {
+    if (!client_id) {
       return res.status(400).json({ error: 'Client ID is required' });
     }
 
-    const campaigns = db.prepare(`
-      SELECT * FROM campaigns 
-      WHERE client_id = ? 
-      ORDER BY created_at DESC
-    `).all(clientId);
+    const client = await pool.connect();
+    const result = await client.query(`
+      SELECT c.*, u.name as account_manager_name
+      FROM campaigns c
+      LEFT JOIN users u ON c.account_manager_id = u.id
+      WHERE c.client_id = $1
+      ORDER BY c.created_at DESC
+    `, [client_id]);
 
-    // Parse JSON fields
-    const formattedCampaigns = campaigns.map(campaign => ({
+    client.release();
+
+    // Parse activities JSON for each campaign
+    const campaigns = result.rows.map(campaign => ({
       ...campaign,
-      activities: JSON.parse(campaign.activities || '[]'),
-      ai_suggestions: campaign.ai_suggestions ? JSON.parse(campaign.ai_suggestions) : []
+      activities: campaign.activities ? JSON.parse(campaign.activities) : []
     }));
 
-    res.json({ campaigns: formattedCampaigns });
+    res.json(campaigns);
   } catch (error) {
-    console.error('Get campaigns error:', error);
+    console.error('Error fetching campaigns:', error);
     res.status(500).json({ error: 'Failed to fetch campaigns' });
   }
 });
 
-// GET /api/campaigns/:id - Get a specific campaign
-router.get('/:id', (req, res) => {
+// POST /api/campaigns/:id/validate - AI validation endpoint
+router.post('/:id/validate', async (req, res) => {
   try {
     const { id } = req.params;
-    const { clientId } = req.query;
+    const campaignData = req.body;
 
-    if (!clientId) {
-      return res.status(400).json({ error: 'Client ID is required' });
+    const validation = await validateCampaignData(campaignData);
+
+    // Update campaign with validation results if campaign exists
+    if (id !== 'new') {
+      const client = await pool.connect();
+      await client.query(`
+        UPDATE campaigns 
+        SET ai_validation_passed = $1, ai_validation_feedback = $2, updated_at = CURRENT_TIMESTAMP
+        WHERE id = $3
+      `, [validation.isValid ? 1 : 0, validation.feedback, id]);
+      client.release();
     }
 
-    const campaign = db.prepare(`
-      SELECT * FROM campaigns 
-      WHERE id = ? AND client_id = ?
-    `).get(id, clientId);
+    res.json(validation);
+  } catch (error) {
+    console.error('Error validating campaign:', error);
+    res.status(500).json({ error: 'Failed to validate campaign' });
+  }
+});
 
-    if (!campaign) {
+// GET /api/campaigns/:id - Get a specific campaign
+router.get('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const client = await pool.connect();
+    const result = await client.query(`
+      SELECT c.*, u.name as account_manager_name
+      FROM campaigns c
+      LEFT JOIN users u ON c.account_manager_id = u.id
+      WHERE c.id = $1
+    `, [id]);
+
+    if (result.rows.length === 0) {
+      client.release();
       return res.status(404).json({ error: 'Campaign not found' });
     }
 
-    // Parse JSON fields
-    const formattedCampaign = {
-      ...campaign,
-      activities: JSON.parse(campaign.activities || '[]'),
-      ai_suggestions: campaign.ai_suggestions ? JSON.parse(campaign.ai_suggestions) : []
+    const campaign = {
+      ...result.rows[0],
+      activities: result.rows[0].activities ? JSON.parse(result.rows[0].activities) : []
     };
 
-    res.json(formattedCampaign);
+    // Get campaign tasks
+    const tasksResult = await client.query(`
+      SELECT t.*, ct.activity_type, ct.is_auto_generated
+      FROM tasks t
+      JOIN campaign_tasks ct ON t.id = ct.task_id
+      WHERE ct.campaign_id = $1
+      ORDER BY t.created_at DESC
+    `, [id]);
+
+    campaign.tasks = tasksResult.rows;
+
+    // Get approval status
+    const approvalsResult = await client.query(`
+      SELECT * FROM campaign_approvals WHERE campaign_id = $1
+    `, [id]);
+
+    campaign.approvals = approvalsResult.rows;
+
+    client.release();
+    res.json(campaign);
   } catch (error) {
-    console.error('Get campaign error:', error);
+    console.error('Error fetching campaign:', error);
     res.status(500).json({ error: 'Failed to fetch campaign' });
   }
 });
 
-// POST /api/campaigns - Create a new campaign
-router.post('/', (req, res) => {
+// POST /api/campaigns - Create new campaign
+router.post('/', async (req, res) => {
   try {
     const {
       name,
       type,
       budget,
-      product,
+      productService,
       objective,
       narrative,
       concept,
       tagline,
-      managerId,
-      managerName,
-      activities = [],
-      requiresInternalApproval = false,
-      requiresClientApproval = false,
-      aiValidated = false,
-      aiScore,
-      aiSuggestions = [],
-      clientId
+      heroArtwork,
+      accountManagerId,
+      activities,
+      internalApprovalRequired,
+      clientApprovalRequired,
+      clientId,
+      createdBy
     } = req.body;
 
-    // Validation
-    if (!name || !type || !budget || !product || !objective || !narrative || !concept || !tagline || !managerId || !managerName || !clientId) {
+    // Validate required fields
+    if (!name || !accountManagerId || !clientId) {
       return res.status(400).json({ 
-        error: 'Missing required fields: name, type, budget, product, objective, narrative, concept, tagline, managerId, managerName, clientId' 
+        error: 'Campaign name, account manager, and client are required' 
       });
     }
 
-    // Insert campaign
-    const insertSQL = `
+    // AI validation
+    const aiValidation = await validateCampaignData({
+      name, objective, activities, budget, narrative, concept, tagline
+    });
+
+    const client = await pool.connect();
+
+    // Check if account manager exists (MongoDB users)
+    let isValidManager = false;
+    try {
+      console.log('Validating account manager ID:', accountManagerId, 'Type:', typeof accountManagerId);
+      const mongoDb = await getDb();
+      const usersCollection = mongoDb.collection('users');
+      
+      // Try multiple approaches to find the user
+      let manager = null;
+      
+      // First try: Direct ObjectId conversion
+      try {
+        if (ObjectId.isValid(accountManagerId)) {
+          manager = await usersCollection.findOne({ 
+            _id: new ObjectId(accountManagerId),
+            $or: [
+              { role: 'employee' },
+              { role: 'admin' }
+            ]
+          });
+          console.log('ObjectId approach found manager:', !!manager);
+        }
+      } catch (objIdError) {
+        console.log('ObjectId approach failed:', objIdError.message);
+      }
+      
+      // Second try: String comparison (in case _id is stored as string)
+      if (!manager) {
+        try {
+          manager = await usersCollection.findOne({ 
+            _id: accountManagerId,
+            $or: [
+              { role: 'employee' },
+              { role: 'admin' }
+            ]
+          });
+          console.log('String approach found manager:', !!manager);
+        } catch (stringError) {
+          console.log('String approach failed:', stringError.message);
+        }
+      }
+      
+      // Third try: Find by any field that matches (fallback)
+      if (!manager) {
+        try {
+          manager = await usersCollection.findOne({ 
+            $or: [
+              { _id: accountManagerId },
+              { _id: ObjectId.isValid(accountManagerId) ? new ObjectId(accountManagerId) : null }
+            ].filter(Boolean),
+            $and: [
+              {
+                $or: [
+                  { role: 'employee' },
+                  { role: 'admin' }
+                ]
+              }
+            ]
+          });
+          console.log('Fallback approach found manager:', !!manager);
+        } catch (fallbackError) {
+          console.log('Fallback approach failed:', fallbackError.message);
+        }
+      }
+      
+      isValidManager = !!manager;
+      if (manager) {
+        console.log('Found manager:', manager.name || manager.username, 'Role:', manager.role);
+      } else {
+        console.log('No manager found with ID:', accountManagerId);
+        // Let's also log all users to debug
+        const allUsers = await usersCollection.find({}, { projection: { _id: 1, name: 1, username: 1, role: 1 } }).toArray();
+        console.log('Available users:', allUsers.map(u => ({ id: u._id, name: u.name || u.username, role: u.role })));
+      }
+      
+    } catch (mongoError) {
+      console.error('MongoDB user validation error:', mongoError);
+      isValidManager = false;
+    }
+
+    if (!isValidManager) {
+      client.release();
+      return res.status(400).json({ error: `Invalid account manager: ${accountManagerId}. Please check if the user exists and has employee/admin role.` });
+    }
+
+    // Create campaign
+    const campaignResult = await client.query(`
       INSERT INTO campaigns (
-        name, type, budget, product, objective, narrative, concept, tagline,
-        manager_id, manager_name, activities, requires_internal_approval, 
-        requires_client_approval, ai_validated, ai_score, ai_suggestions, 
-        client_id, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `;
+        name, type, budget, product_service, objective, narrative, concept,
+        tagline, hero_artwork, account_manager_id, activities,
+        internal_approval_required, client_approval_required,
+        ai_validation_passed, ai_validation_feedback,
+        client_id, created_by
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+      RETURNING id
+    `, [
+      name, type, budget, productService, objective, narrative, concept,
+      tagline, heroArtwork, accountManagerId, JSON.stringify(activities || []),
+      internalApprovalRequired ? 1 : 0, clientApprovalRequired ? 1 : 0,
+      aiValidation.isValid ? 1 : 0, aiValidation.feedback,
+      clientId, createdBy
+    ]);
 
-    const result = db.prepare(insertSQL).run(
-      name,
-      type,
-      budget,
-      product,
-      objective,
-      narrative,
-      concept,
-      tagline,
-      managerId,
-      managerName,
-      JSON.stringify(activities),
-      requiresInternalApproval ? 1 : 0,
-      requiresClientApproval ? 1 : 0,
-      aiValidated ? 1 : 0,
-      aiScore || null,
-      JSON.stringify(aiSuggestions),
-      clientId,
-      'active'
-    );
+    const campaignId = campaignResult.rows[0].id;
 
-    // Get the created campaign
-    const campaign = db.prepare('SELECT * FROM campaigns WHERE id = ?').get(result.lastInsertRowid);
+    // Create approval records if required
+    if (internalApprovalRequired) {
+      await client.query(`
+        INSERT INTO campaign_approvals (campaign_id, approval_type)
+        VALUES ($1, 'internal')
+      `, [campaignId]);
+    }
 
-    // Parse JSON fields for response
-    const formattedCampaign = {
-      ...campaign,
-      activities: JSON.parse(campaign.activities || '[]'),
-      ai_suggestions: campaign.ai_suggestions ? JSON.parse(campaign.ai_suggestions) : []
-    };
+    if (clientApprovalRequired) {
+      await client.query(`
+        INSERT INTO campaign_approvals (campaign_id, approval_type)
+        VALUES ($1, 'client')
+      `, [campaignId]);
+    }
+
+    client.release();
+
+    // Generate auto tasks based on activities
+    let createdTasks = [];
+    if (activities && activities.length > 0) {
+      try {
+        createdTasks = await createCampaignTasks(campaignId, activities, clientId, createdBy);
+      } catch (taskError) {
+        console.error('Error creating campaign tasks:', taskError);
+        // Don't fail the campaign creation if task creation fails
+      }
+    }
 
     res.status(201).json({
+      success: true,
+      campaignId,
       message: 'Campaign created successfully',
-      campaign: formattedCampaign
+      aiValidation,
+      tasksCreated: createdTasks.length,
+      tasks: createdTasks
     });
+
   } catch (error) {
-    console.error('Create campaign error:', error);
+    console.error('Error creating campaign:', error);
     res.status(500).json({ error: 'Failed to create campaign' });
   }
 });
 
-// PUT /api/campaigns/:id - Update a campaign
-router.put('/:id', (req, res) => {
+// GET /api/campaigns/:id/tasks - Get tasks for a specific campaign
+router.get('/:id/tasks', async (req, res) => {
   try {
-    const { id } = req.params;
-    const {
-      name,
-      type,
-      budget,
-      product,
-      objective,
-      narrative,
-      concept,
-      tagline,
-      managerId,
-      managerName,
-      activities,
-      requiresInternalApproval,
-      requiresClientApproval,
-      aiValidated,
-      aiScore,
-      aiSuggestions,
-      status,
-      clientId
-    } = req.body;
+    const { id: campaignId } = req.params;
+    const { client_id } = req.query;
 
-    if (!clientId) {
+    if (!client_id) {
       return res.status(400).json({ error: 'Client ID is required' });
     }
 
-    // Check if campaign exists and belongs to client
-    const existingCampaign = db.prepare(`
-      SELECT * FROM campaigns WHERE id = ? AND client_id = ?
-    `).get(id, clientId);
+    const client = await pool.connect();
+    
+    // Get campaign tasks with full task details
+    const result = await client.query(`
+      SELECT t.*, ct.activity_type, c.name as campaign_name
+      FROM tasks t
+      INNER JOIN campaign_tasks ct ON t.id = ct.task_id
+      INNER JOIN campaigns c ON ct.campaign_id = c.id
+      WHERE ct.campaign_id = ? AND t.client_id = ?
+      ORDER BY t.created_at ASC
+    `, [campaignId, client_id]);
 
-    if (!existingCampaign) {
+    client.release();
+    
+    const tasks = result.map(task => ({
+      id: task.id,
+      title: task.title,
+      description: task.description,
+      status: task.status,
+      assignee: task.assignee,
+      deadline: task.deadline,
+      clientComments: task.client_comments,
+      actionLabsComments: task.action_labs_comments,
+      link: task.link,
+      parentId: task.parent_id,
+      visibleToClient: task.visible_to_client === 1,
+      createdAt: task.created_at,
+      updatedAt: task.updated_at,
+      activityType: task.activity_type,
+      campaignName: task.campaign_name
+    }));
+
+    res.json({ tasks });
+
+  } catch (error) {
+    console.error('Error fetching campaign tasks:', error);
+    res.status(500).json({ error: 'Failed to fetch campaign tasks' });
+  }
+});
+
+// Link a task to a campaign
+router.post('/tasks/link', async (req, res) => {
+  try {
+    const { campaignId, taskId, activityType = 'custom' } = req.body;
+
+    if (!campaignId || !taskId) {
+      return res.status(400).json({ error: 'Campaign ID and Task ID are required' });
+    }
+
+    // Check if campaign exists
+    const campaignResult = await pool.query('SELECT id FROM campaigns WHERE id = ?', [campaignId]);
+    if (campaignResult.length === 0) {
       return res.status(404).json({ error: 'Campaign not found' });
     }
 
-    // Update campaign
-    const updateSQL = `
-      UPDATE campaigns SET
-        name = COALESCE(?, name),
-        type = COALESCE(?, type),
-        budget = COALESCE(?, budget),
-        product = COALESCE(?, product),
-        objective = COALESCE(?, objective),
-        narrative = COALESCE(?, narrative),
-        concept = COALESCE(?, concept),
-        tagline = COALESCE(?, tagline),
-        manager_id = COALESCE(?, manager_id),
-        manager_name = COALESCE(?, manager_name),
-        activities = COALESCE(?, activities),
-        requires_internal_approval = COALESCE(?, requires_internal_approval),
-        requires_client_approval = COALESCE(?, requires_client_approval),
-        ai_validated = COALESCE(?, ai_validated),
-        ai_score = COALESCE(?, ai_score),
-        ai_suggestions = COALESCE(?, ai_suggestions),
-        status = COALESCE(?, status),
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = ? AND client_id = ?
-    `;
-
-    db.prepare(updateSQL).run(
-      name || null,
-      type || null,
-      budget || null,
-      product || null,
-      objective || null,
-      narrative || null,
-      concept || null,
-      tagline || null,
-      managerId || null,
-      managerName || null,
-      activities ? JSON.stringify(activities) : null,
-      requiresInternalApproval !== undefined ? (requiresInternalApproval ? 1 : 0) : null,
-      requiresClientApproval !== undefined ? (requiresClientApproval ? 1 : 0) : null,
-      aiValidated !== undefined ? (aiValidated ? 1 : 0) : null,
-      aiScore || null,
-      aiSuggestions ? JSON.stringify(aiSuggestions) : null,
-      status || null,
-      id,
-      clientId
+    // Check if link already exists
+    const existingLink = await pool.query(
+      'SELECT * FROM campaign_tasks WHERE campaign_id = ? AND task_id = ?',
+      [campaignId, taskId]
     );
 
-    // Get updated campaign
-    const updatedCampaign = db.prepare('SELECT * FROM campaigns WHERE id = ?').get(id);
+    if (existingLink.length > 0) {
+      return res.status(409).json({ error: 'Task is already linked to this campaign' });
+    }
 
-    // Parse JSON fields
-    const formattedCampaign = {
-      ...updatedCampaign,
-      activities: JSON.parse(updatedCampaign.activities || '[]'),
-      ai_suggestions: updatedCampaign.ai_suggestions ? JSON.parse(updatedCampaign.ai_suggestions) : []
-    };
+    // Create the link
+    await pool.query(
+      'INSERT INTO campaign_tasks (campaign_id, task_id, activity_type) VALUES (?, ?, ?)',
+      [campaignId, taskId, activityType]
+    );
 
-    res.json({
-      message: 'Campaign updated successfully',
-      campaign: formattedCampaign
+    res.json({ 
+      success: true, 
+      message: 'Task linked to campaign successfully',
+      campaignId,
+      taskId,
+      activityType
     });
+
   } catch (error) {
-    console.error('Update campaign error:', error);
-    res.status(500).json({ error: 'Failed to update campaign' });
-  }
-});
-
-// DELETE /api/campaigns/:id - Delete a campaign
-router.delete('/:id', (req, res) => {
-  try {
-    const { id } = req.params;
-    const { clientId } = req.query;
-
-    if (!clientId) {
-      return res.status(400).json({ error: 'Client ID is required' });
-    }
-
-    // Check if campaign exists and belongs to client
-    const existingCampaign = db.prepare(`
-      SELECT * FROM campaigns WHERE id = ? AND client_id = ?
-    `).get(id, clientId);
-
-    if (!existingCampaign) {
-      return res.status(404).json({ error: 'Campaign not found' });
-    }
-
-    // Delete campaign
-    db.prepare('DELETE FROM campaigns WHERE id = ? AND client_id = ?').run(id, clientId);
-
-    res.json({ message: 'Campaign deleted successfully' });
-  } catch (error) {
-    console.error('Delete campaign error:', error);
-    res.status(500).json({ error: 'Failed to delete campaign' });
-  }
-});
-
-// POST /api/campaigns/:id/validate - AI validate a campaign
-router.post('/:id/validate', (req, res) => {
-  try {
-    const { id } = req.params;
-    const { clientId } = req.body;
-
-    if (!clientId) {
-      return res.status(400).json({ error: 'Client ID is required' });
-    }
-
-    // Get campaign
-    const campaign = db.prepare(`
-      SELECT * FROM campaigns WHERE id = ? AND client_id = ?
-    `).get(id, clientId);
-
-    if (!campaign) {
-      return res.status(404).json({ error: 'Campaign not found' });
-    }
-
-    // Simulate AI validation logic
-    const aiScore = Math.floor(Math.random() * 20) + 80; // Score between 80-100
-    const aiSuggestions = [
-      'Consider expanding your target audience demographic analysis',
-      'Budget allocation appears optimal for selected marketing activities',
-      'Campaign narrative aligns well with current market trends',
-      'Recommended to include A/B testing for creative elements'
-    ];
-
-    // Update campaign with AI validation results
-    db.prepare(`
-      UPDATE campaigns SET
-        ai_validated = 1,
-        ai_score = ?,
-        ai_suggestions = ?,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = ? AND client_id = ?
-    `).run(aiScore, JSON.stringify(aiSuggestions), id, clientId);
-
-    res.json({
-      message: 'Campaign validated successfully',
-      aiScore,
-      aiSuggestions
-    });
-  } catch (error) {
-    console.error('AI validation error:', error);
-    res.status(500).json({ error: 'Failed to validate campaign' });
+    console.error('Error linking task to campaign:', error);
+    res.status(500).json({ error: 'Failed to link task to campaign' });
   }
 });
 

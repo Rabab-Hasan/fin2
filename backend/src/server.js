@@ -46,6 +46,9 @@ app.use('/api/meta', require('./routes/meta'));
 // Initialize roadmap routes
 app.use('/api/roadmap', require('./routes/roadmap'));
 
+// Initialize campaigns routes
+app.use('/api/campaigns', require('./routes/campaigns'));
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
