@@ -143,6 +143,10 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className = '' }) =
 
           {/* Notifications List */}
           <div className="max-h-80 overflow-y-auto">
+            {(() => {
+              console.log('🔔 NotificationBell: Render state - loading:', loading, 'notifications count:', notifications.length);
+              return null;
+            })()}
             {loading ? (
               <div className="p-4 text-center text-gray-500">
                 <div className="animate-pulse">Loading notifications...</div>

@@ -55,6 +55,9 @@ app.use('/api/campaign-performance', require('./routes/campaign-performance'));
 // Initialize notifications routes
 app.use('/api/notifications', require('./routes/notifications'));
 
+// Initialize KNIME integration routes (chatbot fallback)
+app.use('/api/knime', require('./routes/knime'));
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });

@@ -16,13 +16,15 @@ const NOTIFICATION_TYPES = {
 // Create notification helper function
 async function createNotification(userId, title, message, type = 'info', actionUrl = null, metadata = null) {
   try {
+    console.log('📧 Creating notification for user:', userId, 'Title:', title);
     const client = await pool.connect();
     const result = await client.query(
       `INSERT INTO notifications (user_id, title, message, type, action_url, metadata, created_at) 
-       VALUES (?, ?, ?, ?, ?, ?, datetime('now'))`,
+       VALUES ($1, $2, $3, $4, $5, $6, datetime('now'))`,
       [userId, title, message, type, actionUrl, JSON.stringify(metadata)]
     );
     client.release();
+    console.log('📧 Notification created with ID:', result.lastID);
     return result.lastID;
   } catch (error) {
     console.error('Error creating notification:', error);
@@ -75,6 +77,8 @@ router.get('/', async (req, res) => {
   try {
     const { userId, unreadOnly = false, limit = 50, offset = 0 } = req.query;
 
+    console.log('📧 Fetching notifications for userId:', userId);
+
     if (!userId) {
       return res.status(400).json({ error: 'User ID is required' });
     }
@@ -82,7 +86,7 @@ router.get('/', async (req, res) => {
     let query = `
       SELECT id, user_id, title, message, type, read_status, action_url, metadata, created_at, updated_at
       FROM notifications 
-      WHERE user_id = ?
+      WHERE user_id = $1
     `;
     
     const params = [userId];
@@ -91,13 +95,18 @@ router.get('/', async (req, res) => {
       query += ` AND read_status = 0`;
     }
 
-    query += ` ORDER BY created_at DESC LIMIT ? OFFSET ?`;
+    query += ` ORDER BY created_at DESC LIMIT $2 OFFSET $3`;
     params.push(parseInt(limit), parseInt(offset));
+
+    console.log('📧 Query:', query);
+    console.log('📧 Params:', params);
 
     const client = await pool.connect();
     const result = await client.query(query, params);
     const notifications = result.rows || result;
     client.release();
+
+    console.log('📧 Found notifications:', notifications?.length || 0);
 
     // Parse metadata for each notification
     const processedNotifications = notifications.map(notification => ({
@@ -105,6 +114,8 @@ router.get('/', async (req, res) => {
       metadata: notification.metadata ? JSON.parse(notification.metadata) : null,
       read_status: Boolean(notification.read_status)
     }));
+
+    console.log('📧 Sending response with notifications:', processedNotifications);
 
     res.json({
       success: true,
@@ -132,7 +143,7 @@ router.get('/unread-count', async (req, res) => {
 
     const client = await pool.connect();
     const result = await client.query(
-      'SELECT COUNT(*) as count FROM notifications WHERE user_id = ? AND read_status = 0',
+      'SELECT COUNT(*) as count FROM notifications WHERE user_id = $1 AND read_status = 0',
       [userId]
     );
     client.release();
@@ -166,7 +177,7 @@ router.put('/:id/read', async (req, res) => {
     await client.query(
       `UPDATE notifications 
        SET read_status = 1, updated_at = datetime('now') 
-       WHERE id = ? AND user_id = ?`,
+       WHERE id = $1 AND user_id = $2`,
       [id, userId]
     );
     client.release();
@@ -198,7 +209,7 @@ router.put('/mark-all-read', async (req, res) => {
     await client.query(
       `UPDATE notifications 
        SET read_status = 1, updated_at = datetime('now') 
-       WHERE user_id = ? AND read_status = 0`,
+       WHERE user_id = $1 AND read_status = 0`,
       [userId]
     );
     client.release();
@@ -229,7 +240,7 @@ router.delete('/:id', async (req, res) => {
 
     const client = await pool.connect();
     await client.query(
-      'DELETE FROM notifications WHERE id = ? AND user_id = ?',
+      'DELETE FROM notifications WHERE id = $1 AND user_id = $2',
       [id, userId]
     );
     client.release();

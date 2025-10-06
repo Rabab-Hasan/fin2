@@ -337,10 +337,13 @@ router.get('/', async (req, res) => {
 
     client.release();
 
-    // Parse activities JSON for each campaign
+    // Parse JSON fields for each campaign
     const campaigns = result.rows.map(campaign => ({
       ...campaign,
-      activities: campaign.activities ? JSON.parse(campaign.activities) : []
+      activities: campaign.activities ? JSON.parse(campaign.activities) : [],
+      countries: campaign.countries ? JSON.parse(campaign.countries) : [],
+      platforms: campaign.platforms ? JSON.parse(campaign.platforms) : [],
+      campaignData: campaign.campaign_data ? JSON.parse(campaign.campaign_data) : {}
     }));
 
     res.json(campaigns);
@@ -396,7 +399,10 @@ router.get('/:id', async (req, res) => {
 
     const campaign = {
       ...result.rows[0],
-      activities: result.rows[0].activities ? JSON.parse(result.rows[0].activities) : []
+      activities: result.rows[0].activities ? JSON.parse(result.rows[0].activities) : [],
+      countries: result.rows[0].countries ? JSON.parse(result.rows[0].countries) : [],
+      platforms: result.rows[0].platforms ? JSON.parse(result.rows[0].platforms) : [],
+      campaignData: result.rows[0].campaign_data ? JSON.parse(result.rows[0].campaign_data) : {}
     };
 
     // Get campaign tasks
@@ -443,7 +449,16 @@ router.post('/', async (req, res) => {
       internalApprovalRequired,
       clientApprovalRequired,
       clientId,
-      createdBy
+      createdBy,
+      // Campaign setup additional fields
+      countries,
+      duration,
+      estimatedReach,
+      estimatedImpressions,
+      estimatedClicks,
+      estimatedCtr,
+      platforms,
+      campaignData
     } = req.body;
 
     // Validate required fields
@@ -556,15 +571,19 @@ router.post('/', async (req, res) => {
         tagline, hero_artwork, account_manager_id, activities,
         internal_approval_required, client_approval_required,
         ai_validation_passed, ai_validation_feedback,
-        client_id, created_by
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+        client_id, created_by,
+        countries, duration, estimated_reach, estimated_impressions, 
+        estimated_clicks, estimated_ctr, platforms, campaign_data
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
       RETURNING id
     `, [
       name, type, budget, productService, objective, narrative, concept,
       tagline, heroArtwork, accountManagerId, JSON.stringify(activities || []),
       internalApprovalRequired ? 1 : 0, clientApprovalRequired ? 1 : 0,
       aiValidation.isValid ? 1 : 0, aiValidation.feedback,
-      clientId, createdBy
+      clientId, createdBy,
+      JSON.stringify(countries || []), duration, estimatedReach, estimatedImpressions,
+      estimatedClicks, estimatedCtr, JSON.stringify(platforms || []), JSON.stringify(campaignData || {})
     ]);
 
     const campaignId = campaignResult.rows[0].id;

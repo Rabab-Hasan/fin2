@@ -13,6 +13,7 @@ import MetaAuthCallback from './pages/MetaAuthCallback';
 
 import ProtectedRoute from './components/ProtectedRoute';
 import RouteProtector from './components/RouteProtector';
+import Chatbot from './components/Chatbot';
 import { ClientProvider } from './contexts/ClientContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { MediaPlanProvider } from './contexts/MediaPlanContext';
@@ -68,6 +69,9 @@ function App() {
                     } />
                   </Routes>
                 </main>
+                
+                {/* AI Chatbot - Available on ALL pages */}
+                <Chatbot />
               </div>
             </ProtectedRoute>
               </Router>
