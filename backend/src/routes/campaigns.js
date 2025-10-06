@@ -3,6 +3,7 @@ const router = express.Router();
 const pool = require('../database');
 const { getDb } = require('../database-mongo');
 const { ObjectId } = require('mongodb');
+const { createCampaignAssignmentNotification } = require('./notifications');
 
 // Activity task templates - auto-generated tasks based on selected activities
 const ACTIVITY_TASK_TEMPLATES = {
@@ -469,59 +470,61 @@ router.post('/', async (req, res) => {
       // Try multiple approaches to find the user
       let manager = null;
       
-      // First try: Direct ObjectId conversion
+      // Define valid account manager roles and user_types
+      const validRoles = ['employee', 'admin', 'hr', 'manager', 'supervisor', 'head_of_marketing'];
+      const validUserTypes = ['employee', 'admin'];
+      
+      // First find the user by ID (either ObjectId or string)
+      let userFound = null;
+      
       try {
         if (ObjectId.isValid(accountManagerId)) {
-          manager = await usersCollection.findOne({ 
-            _id: new ObjectId(accountManagerId),
-            $or: [
-              { role: 'employee' },
-              { role: 'admin' }
-            ]
-          });
-          console.log('ObjectId approach found manager:', !!manager);
+          userFound = await usersCollection.findOne({ _id: new ObjectId(accountManagerId) });
+          console.log('Found user with ObjectId:', !!userFound);
         }
-      } catch (objIdError) {
-        console.log('ObjectId approach failed:', objIdError.message);
-      }
-      
-      // Second try: String comparison (in case _id is stored as string)
-      if (!manager) {
-        try {
-          manager = await usersCollection.findOne({ 
-            _id: accountManagerId,
-            $or: [
-              { role: 'employee' },
-              { role: 'admin' }
-            ]
-          });
-          console.log('String approach found manager:', !!manager);
-        } catch (stringError) {
-          console.log('String approach failed:', stringError.message);
+        
+        if (!userFound) {
+          userFound = await usersCollection.findOne({ _id: accountManagerId });
+          console.log('Found user with string ID:', !!userFound);
         }
-      }
-      
-      // Third try: Find by any field that matches (fallback)
-      if (!manager) {
-        try {
-          manager = await usersCollection.findOne({ 
-            $or: [
-              { _id: accountManagerId },
-              { _id: ObjectId.isValid(accountManagerId) ? new ObjectId(accountManagerId) : null }
-            ].filter(Boolean),
-            $and: [
-              {
-                $or: [
-                  { role: 'employee' },
-                  { role: 'admin' }
-                ]
-              }
-            ]
+        
+        if (userFound) {
+          console.log('User details:', {
+            name: userFound.name,
+            role: userFound.role,
+            user_type: userFound.user_type,
+            email: userFound.email
           });
-          console.log('Fallback approach found manager:', !!manager);
-        } catch (fallbackError) {
-          console.log('Fallback approach failed:', fallbackError.message);
+          
+          // Check if user is eligible to be account manager
+          const hasValidRole = userFound.role && validRoles.includes(userFound.role);
+          const hasValidUserType = userFound.user_type && validUserTypes.includes(userFound.user_type);
+          const isNotClient = userFound.role !== 'client' && userFound.user_type !== 'client';
+          
+          // Accept user if:
+          // 1. They have a valid role, OR
+          // 2. They have a valid user_type, OR  
+          // 3. They're not a client (for backward compatibility)
+          if (hasValidRole || hasValidUserType || (isNotClient && !userFound.role)) {
+            manager = userFound;
+            console.log('✅ User accepted as account manager:', {
+              reason: hasValidRole ? `valid role: ${userFound.role}` : 
+                      hasValidUserType ? `valid user_type: ${userFound.user_type}` : 
+                      'not a client user'
+            });
+          } else {
+            console.log('❌ User rejected as account manager:', {
+              role: userFound.role,
+              user_type: userFound.user_type,
+              reason: 'Not eligible for account management'
+            });
+          }
+        } else {
+          console.log('❌ No user found with ID:', accountManagerId);
         }
+        
+      } catch (error) {
+        console.log('Error finding user:', error.message);
       }
       
       isValidManager = !!manager;
@@ -541,7 +544,9 @@ router.post('/', async (req, res) => {
 
     if (!isValidManager) {
       client.release();
-      return res.status(400).json({ error: `Invalid account manager: ${accountManagerId}. Please check if the user exists and has employee/admin role.` });
+      return res.status(400).json({ 
+        error: `Account manager validation failed. Please check the server logs for details and try again.` 
+      });
     }
 
     // Create campaign
@@ -590,6 +595,15 @@ router.post('/', async (req, res) => {
         console.error('Error creating campaign tasks:', taskError);
         // Don't fail the campaign creation if task creation fails
       }
+    }
+
+    // Send notification to account manager
+    try {
+      await createCampaignAssignmentNotification(accountManagerId, name, campaignId, createdBy);
+      console.log('✅ Campaign assignment notification sent to:', accountManagerId);
+    } catch (notificationError) {
+      console.error('⚠️ Failed to send campaign assignment notification:', notificationError);
+      // Don't fail the campaign creation if notification fails
     }
 
     res.status(201).json({

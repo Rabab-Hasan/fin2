@@ -78,14 +78,32 @@ const CampaignWizard: React.FC<CampaignWizardProps> = ({ isOpen, onClose, onSucc
   useEffect(() => {
     const fetchEmployeeUsers = async () => {
       try {
+        console.log('Fetching users for account manager selection...');
         const response = await fetch('/api/auth/users');
         if (response.ok) {
           const result = await response.json();
+          console.log('All users from API:', result.users);
+          
           // Filter to only include employee users (excluding client users)
-          const employeeUsers = result.users.filter((user: any) => 
-            user.role === 'employee' || user.role === 'admin'
-          );
+          const employeeUsers = result.users.filter((user: any) => {
+            // Include users with valid roles
+            const validRoles = ['employee', 'admin', 'hr', 'manager', 'supervisor', 'head_of_marketing'];
+            const hasValidRole = user.role && validRoles.includes(user.role);
+            
+            // Include users with valid user_types
+            const validUserTypes = ['employee', 'admin'];
+            const hasValidUserType = user.user_type && validUserTypes.includes(user.user_type);
+            
+            // Exclude clients
+            const isNotClient = user.role !== 'client' && user.user_type !== 'client';
+            
+            // Accept if has valid role/user_type or is not a client (for users without role field)
+            return hasValidRole || hasValidUserType || (isNotClient && !user.role);
+          });
+          console.log('Filtered employee users:', employeeUsers);
           setUsers(employeeUsers);
+        } else {
+          console.error('Failed to fetch users. Status:', response.status);
         }
       } catch (error) {
         console.error('Error fetching users:', error);
@@ -682,11 +700,15 @@ const CampaignWizard: React.FC<CampaignWizardProps> = ({ isOpen, onClose, onSucc
                   autoFocus
                 >
                   <option value="">Select an account manager</option>
-                  {users.map((user) => (
-                    <option key={user._id || user.id} value={user._id || user.id}>
-                      {user.name} - {user.email}
-                    </option>
-                  ))}
+                  {users.length === 0 ? (
+                    <option disabled>No users available</option>
+                  ) : (
+                    users.map((user) => (
+                      <option key={user._id || user.id} value={user._id || user.id}>
+                        {user.name} - {user.email} ({user.role || user.user_type})
+                      </option>
+                    ))
+                  )}
                 </select>
                 {errors.accountManagerId && <p className="text-red-500 text-sm mt-1">{errors.accountManagerId}</p>}
                 <p className="text-sm text-gray-600 mt-2">

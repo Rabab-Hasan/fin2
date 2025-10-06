@@ -52,6 +52,9 @@ app.use('/api/campaigns', require('./routes/campaigns'));
 // Initialize campaign performance routes
 app.use('/api/campaign-performance', require('./routes/campaign-performance'));
 
+// Initialize notifications routes
+app.use('/api/notifications', require('./routes/notifications'));
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });

@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { Home, Database, FlaskConical, ClipboardList, Building, LogOut, User, Target } from 'lucide-react';
 import { useClient } from '../contexts/ClientContext';
 import { useAuth } from '../contexts/AuthContext';
+import NotificationBell from './NotificationBell';
 
 const NavBar: React.FC = () => {
   const location = useLocation();
@@ -82,6 +83,9 @@ const NavBar: React.FC = () => {
                 </span>
               </div>
             )}
+
+            {/* Notification Bell */}
+            {user && <NotificationBell />}
             
             {/* User Menu */}
             {user && (

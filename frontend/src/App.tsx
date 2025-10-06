@@ -16,6 +16,7 @@ import RouteProtector from './components/RouteProtector';
 import { ClientProvider } from './contexts/ClientContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { MediaPlanProvider } from './contexts/MediaPlanContext';
+import { NotificationProvider } from './contexts/NotificationContext';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -31,9 +32,10 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <ClientProvider>
-          <MediaPlanProvider>
-            <Router>
+        <NotificationProvider>
+          <ClientProvider>
+            <MediaPlanProvider>
+              <Router>
             <ProtectedRoute>
               <div className="min-h-screen bg-gray-50">
                 <NavBar />
@@ -68,9 +70,10 @@ function App() {
                 </main>
               </div>
             </ProtectedRoute>
-            </Router>
-          </MediaPlanProvider>
-        </ClientProvider>
+              </Router>
+            </MediaPlanProvider>
+          </ClientProvider>
+        </NotificationProvider>
       </AuthProvider>
     </QueryClientProvider>
   );
