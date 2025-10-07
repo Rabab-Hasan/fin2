@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Globe, DollarSign, Calendar, Zap, Target, Percent, RotateCcw, Save, Trash2, Brain, TrendingUp, Users, Eye, MousePointer } from 'lucide-react';
+import { Globe, DollarSign, Calendar, Zap, Target, Percent, RotateCcw, Save, Trash2, Brain, TrendingUp, Users, Eye, MousePointer, Database, Plus, CheckCircle } from 'lucide-react';
+import { calculateDataDrivenEstimates, type EstimationResult } from '../utils/campaignEstimations';
+import { useAuth } from '../contexts/AuthContext';
+import { useClient } from '../contexts/ClientContext';
+import CampaignAssistantComponent from '../components/CampaignAssistantComponent';
 
 interface Platform {
   name: string;
@@ -12,16 +16,8 @@ interface ContentItem {
   comment: string;
 }
 
-interface BudgetImpact {
-  estimatedReach: number;
-  estimatedImpressions: number;
-  estimatedClicks: number;
-  estimatedConversions: number;
-  costPerClick: number;
-  costPerConversion: number;
-  confidence: 'high' | 'medium' | 'low';
-  insights: string[];
-  recommendations: string[];
+interface BudgetImpact extends EstimationResult {
+  // EstimationResult already includes all the properties we need
 }
 
 interface CountrySetup {
@@ -33,11 +29,30 @@ interface CountrySetup {
   budgetImpact?: BudgetImpact;
 }
 
+interface SavedCampaign {
+  id?: number;
+  name: string;
+  countries: string[];
+  totalBudget: number;
+  duration: number;
+  platforms: Platform[];
+  content: ContentItem[];
+  budgetImpact?: BudgetImpact;
+  createdAt?: string;
+  status?: string;
+}
+
 const CampaignSetup: React.FC = () => {
+  const { user } = useAuth();
+  const { selectedClient } = useClient();
+  
   const [currentStep, setCurrentStep] = useState(1);
   const [currentCountryIndex, setCurrentCountryIndex] = useState(0);
   const [countrySetups, setCountrySetups] = useState<CountrySetup[]>([]);
   const [savedSetups, setSavedSetups] = useState<CountrySetup[]>([]);
+  const [savedCampaigns, setSavedCampaigns] = useState<SavedCampaign[]>([]);
+  const [campaignName, setCampaignName] = useState('');
+  const [isCreatingCampaign, setIsCreatingCampaign] = useState(false);
   const [currentSetup, setCurrentSetup] = useState<CountrySetup>({
     countries: [],
     totalBudget: 0,
@@ -56,12 +71,124 @@ const CampaignSetup: React.FC = () => {
         console.error('Error loading saved setups:', error);
       }
     }
-  }, []);
+    
+    // Load saved campaigns from backend
+    loadSavedCampaigns();
+  }, [selectedClient]);
 
   // Save setups to localStorage whenever savedSetups changes
   useEffect(() => {
     localStorage.setItem('campaignSetups', JSON.stringify(savedSetups));
   }, [savedSetups]);
+
+  // Load saved campaigns from backend
+  const loadSavedCampaigns = async () => {
+    if (!selectedClient) return;
+    
+    try {
+      const response = await fetch(`/api/campaigns?client_id=${selectedClient.id}`);
+      if (response.ok) {
+        const campaigns = await response.json();
+        setSavedCampaigns(campaigns.map((campaign: any) => ({
+          id: campaign.id,
+          name: campaign.name,
+          countries: campaign.countries || [],
+          totalBudget: campaign.budget || 0,
+          duration: campaign.duration || 0,
+          platforms: campaign.platforms || [],
+          content: campaign.content || [],
+          budgetImpact: campaign.budget_impact,
+          createdAt: campaign.created_at,
+          status: campaign.status || 'active'
+        })));
+      }
+    } catch (error) {
+      console.error('Error loading saved campaigns:', error);
+    }
+  };
+
+  // Save campaign to backend
+  const saveCampaignToBackend = async () => {
+    if (!campaignName.trim() || !selectedClient || !user) {
+      alert('Please enter a campaign name and ensure you have a client selected');
+      return;
+    }
+
+    if (currentSetup.countries.length === 0) {
+      alert('Please select at least one country');
+      return;
+    }
+
+    if (currentSetup.platforms.length === 0) {
+      alert('Please select at least one platform');
+      return;
+    }
+
+    setIsCreatingCampaign(true);
+
+    try {
+      const budgetImpact = calculateBudgetImpact(currentSetup);
+      
+      const campaignData = {
+        name: campaignName,
+        type: 'Media Plan',
+        budget: currentSetup.totalBudget,
+        productService: 'Campaign from Media Plan Setup',
+        objective: `Multi-platform campaign for ${currentSetup.countries.join(', ')}`,
+        narrative: `Campaign targeting ${currentSetup.countries.join(', ')} with budget of $${currentSetup.totalBudget.toLocaleString()} over ${currentSetup.duration} days`,
+        concept: currentSetup.platforms.map(p => p.name).join(', ') + ' campaign',
+        tagline: campaignName,
+        heroArtwork: null,
+        accountManagerId: user._id,
+        activities: currentSetup.platforms.map(p => p.name.toLowerCase().replace(/\s+/g, '_')),
+        internalApprovalRequired: false,
+        clientApprovalRequired: false,
+        clientId: selectedClient.id,
+        createdBy: user._id,
+        // Additional campaign setup data
+        countries: currentSetup.countries,
+        duration: currentSetup.duration,
+        platforms: currentSetup.platforms,
+        content: currentSetup.content,
+        budgetImpact: budgetImpact
+      };
+
+      const response = await fetch('/api/campaigns', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(campaignData)
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        alert(`Campaign "${campaignName}" created successfully!`);
+        
+        // Reset form
+        setCampaignName('');
+        setCurrentSetup({
+          countries: [],
+          totalBudget: 0,
+          duration: 0,
+          platforms: [],
+          content: []
+        });
+        setCurrentStep(1);
+        
+        // Reload campaigns
+        await loadSavedCampaigns();
+      } else {
+        const error = await response.json();
+        alert(`Error creating campaign: ${error.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error creating campaign:', error);
+      alert('Error creating campaign. Please try again.');
+    } finally {
+      setIsCreatingCampaign(false);
+    }
+  };
 
   const availableCountries = [
     'Bahrain', 'Saudi Arabia', 'United Arab Emirates', 'Oman', 'Qatar', 'Kuwait',
@@ -205,119 +332,47 @@ const CampaignSetup: React.FC = () => {
     });
   };
 
-  // AI Agent for Budget Impact Prediction
+  // Handle applying recommendations from the AI assistant
+  const handleRecommendationApply = (type: string, data: any) => {
+    if (type === 'content') {
+      // Add recommended content if not already selected
+      if (!currentSetup.content.some(c => c.type === data)) {
+        setCurrentSetup({
+          ...currentSetup,
+          content: [...currentSetup.content, { type: data, comment: '' }]
+        });
+      }
+    }
+    // Add other recommendation types as needed
+  };
+
+  // Data-Driven Budget Impact Prediction using GFH Historical Data
   const calculateBudgetImpact = (setup: CountrySetup): BudgetImpact => {
     const { totalBudget, duration, platforms, countries, content } = setup;
-    const dailyBudget = totalBudget / duration;
     
-    // Base metrics calculation based on industry averages
-    let baseReachMultiplier = 1000; // Base reach per $1
-    let baseImpressionMultiplier = 5000; // Base impressions per $1
-    let baseCTR = 0.02; // 2% click-through rate
-    let baseConversionRate = 0.05; // 5% conversion rate
-    
-    // Adjust based on platforms
-    platforms.forEach(platform => {
-      const platformBudget = (totalBudget * platform.budget) / 100;
-      
-      switch (platform.name) {
-        case 'Meta (Facebook)':
-          baseReachMultiplier *= 1.2; // Higher reach on Meta
-          baseCTR *= 1.1;
-          break;
-        case 'Instagram':
-          baseReachMultiplier *= 1.1;
-          baseCTR *= 1.3; // Better engagement on Instagram
-          break;
-        case 'Google Ads':
-          baseReachMultiplier *= 0.8; // Lower reach but higher intent
-          baseCTR *= 2.5; // Much higher CTR for search
-          baseConversionRate *= 3; // Higher conversion rate
-          break;
-        case 'TikTok':
-          baseReachMultiplier *= 1.5; // High reach on TikTok
-          baseCTR *= 0.8; // Lower CTR but high engagement
-          break;
-        case 'LinkedIn':
-          baseReachMultiplier *= 0.6; // Lower reach but professional
-          baseCTR *= 1.2;
-          baseConversionRate *= 2; // B2B conversions
-          break;
-      }
-    });
-    
-    // Adjust based on countries (GCC markets)
-    const gccCountries = ['Bahrain', 'Saudi Arabia', 'United Arab Emirates', 'Oman', 'Qatar', 'Kuwait'];
-    const hasGCC = countries.some(country => gccCountries.includes(country));
-    if (hasGCC) {
-      baseReachMultiplier *= 0.7; // Smaller but higher value markets
-      baseCTR *= 1.4; // Better engagement in GCC
-      baseConversionRate *= 1.6; // Higher purchasing power
-    }
-    
-    // Adjust based on content diversity
-    const contentDiversity = content.length;
-    if (contentDiversity > 10) {
-      baseCTR *= 1.3; // More content variety improves engagement
-      baseConversionRate *= 1.2;
-    } else if (contentDiversity > 5) {
-      baseCTR *= 1.15;
-      baseConversionRate *= 1.1;
-    }
-    
-    // Calculate final metrics
-    const estimatedReach = Math.round(totalBudget * baseReachMultiplier);
-    const estimatedImpressions = Math.round(totalBudget * baseImpressionMultiplier);
-    const estimatedClicks = Math.round(estimatedImpressions * baseCTR);
-    const estimatedConversions = Math.round(estimatedClicks * baseConversionRate);
-    const costPerClick = estimatedClicks > 0 ? totalBudget / estimatedClicks : 0;
-    const costPerConversion = estimatedConversions > 0 ? totalBudget / estimatedConversions : 0;
-    
-    // Generate insights
-    const insights: string[] = [];
-    const recommendations: string[] = [];
-    
-    if (dailyBudget < 50) {
-      insights.push("Low daily budget may limit reach potential");
-      recommendations.push("Consider extending campaign duration or increasing budget");
-    } else if (dailyBudget > 500) {
-      insights.push("High daily budget enables aggressive market penetration");
-      recommendations.push("Monitor performance closely to optimize spend efficiency");
-    }
-    
-    if (platforms.some(p => p.name === 'Google Ads' && p.budget > 40)) {
-      insights.push("Strong Google Ads allocation will drive high-intent traffic");
-      recommendations.push("Focus on conversion-optimized landing pages");
-    }
-    
-    if (hasGCC) {
-      insights.push("GCC markets show higher engagement and conversion rates");
-      recommendations.push("Leverage premium content for affluent GCC audiences");
-    }
-    
-    if (contentDiversity > 8) {
-      insights.push("Diverse content mix will improve audience engagement");
-      recommendations.push("A/B test different content types to identify top performers");
-    }
-    
-    // Determine confidence level
-    let confidence: 'high' | 'medium' | 'low' = 'medium';
-    if (totalBudget >= 1000 && duration >= 7 && platforms.length >= 2) {
-      confidence = 'high';
-    } else if (totalBudget < 200 || duration < 3) {
-      confidence = 'low';
-    }
+    // Use the new data-driven estimation function
+    const result = calculateDataDrivenEstimates(
+      totalBudget,
+      platforms,
+      countries,
+      duration,
+      content.length
+    );
     
     return {
-      estimatedReach,
-      estimatedImpressions,
-      estimatedClicks,
-      estimatedConversions,
-      costPerClick: Math.round(costPerClick * 100) / 100,
-      costPerConversion: Math.round(costPerConversion * 100) / 100,
-      confidence,
-      insights,
-      recommendations
+      estimatedReach: result.estimatedReach,
+      estimatedImpressions: result.estimatedImpressions,
+      estimatedClicks: result.estimatedClicks,
+      estimatedConversions: result.estimatedConversions,
+      costPerClick: result.costPerClick,
+      costPerConversion: result.costPerConversion,
+      confidence: result.confidence,
+      insights: result.insights,
+      recommendations: result.recommendations,
+      averageCPM: result.averageCPM,
+      averageCPC: result.averageCPC,
+      averageCTR: result.averageCTR,
+      dataPoints: result.dataPoints
     };
   };
 
@@ -333,9 +388,66 @@ const CampaignSetup: React.FC = () => {
     }
   };
 
-  const finishCountrySetup = () => {
+  const finishCountrySetup = async () => {
     const budgetImpact = calculateBudgetImpact(currentSetup);
     const newSetup = { ...currentSetup, budgetImpact };
+    
+    // Auto-generate campaign name if not provided
+    const autoGeneratedName = `Campaign_${currentSetup.countries.join('_')}_${Date.now()}`;
+    
+    // Automatically save as campaign to backend
+    if (selectedClient && user && currentSetup.countries.length > 0) {
+      try {
+        const campaignData = {
+          name: autoGeneratedName,
+          type: 'Media Plan',
+          budget: currentSetup.totalBudget,
+          productService: 'Campaign from Media Plan Setup',
+          objective: `Multi-platform campaign for ${currentSetup.countries.join(', ')}`,
+          narrative: `Campaign targeting ${currentSetup.countries.join(', ')} with budget of $${currentSetup.totalBudget.toLocaleString()} over ${currentSetup.duration} days`,
+          concept: currentSetup.platforms.map(p => p.name).join(', ') + ' campaign',
+          tagline: autoGeneratedName,
+          heroArtwork: null,
+          accountManagerId: user._id,
+          activities: currentSetup.platforms.map(p => p.name.toLowerCase().replace(/\s+/g, '_')),
+          internalApprovalRequired: false,
+          clientApprovalRequired: false,
+          clientId: selectedClient.id,
+          createdBy: user._id,
+          // Additional campaign setup data
+          countries: currentSetup.countries,
+          duration: currentSetup.duration,
+          platforms: currentSetup.platforms,
+          content: currentSetup.content,
+          budgetImpact: budgetImpact,
+          estimatedReach: budgetImpact.estimatedReach,
+          estimatedImpressions: budgetImpact.estimatedImpressions,
+          estimatedClicks: budgetImpact.estimatedClicks,
+          estimatedCtr: budgetImpact.averageCTR,
+          campaignData: newSetup
+        };
+
+        const response = await fetch('/api/campaigns', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(campaignData)
+        });
+
+        if (response.ok) {
+          console.log('✅ Campaign auto-saved successfully!');
+          // Reload campaigns to show in table
+          await loadSavedCampaigns();
+        } else {
+          console.error('❌ Failed to auto-save campaign');
+        }
+      } catch (error) {
+        console.error('❌ Error auto-saving campaign:', error);
+      }
+    }
+    
+    // Also keep in local setups for backward compatibility
     setCountrySetups([...countrySetups, newSetup]);
     setSavedSetups([...savedSetups, newSetup]);
     setCurrentCountryIndex(currentCountryIndex + 1);
@@ -349,7 +461,7 @@ const CampaignSetup: React.FC = () => {
     });
   };
 
-  const copyPreviousSetup = () => {
+  const copyPreviousSetup = async () => {
     if (countrySetups.length > 0) {
       const lastSetup = countrySetups[countrySetups.length - 1];
       // Apply same setup to remaining countries from the original selection
@@ -363,6 +475,61 @@ const CampaignSetup: React.FC = () => {
           ...lastSetup,
           countries: [country]
         }));
+        
+        // Save each setup as a campaign automatically
+        if (selectedClient && user) {
+          for (const setup of newSetups) {
+            const autoGeneratedName = `Campaign_${setup.countries.join('_')}_${Date.now()}`;
+            const budgetImpact = calculateBudgetImpact(setup);
+            
+            try {
+              const campaignData = {
+                name: autoGeneratedName,
+                type: 'Media Plan',
+                budget: setup.totalBudget,
+                productService: 'Campaign from Media Plan Setup',
+                objective: `Multi-platform campaign for ${setup.countries.join(', ')}`,
+                narrative: `Campaign targeting ${setup.countries.join(', ')} with budget of $${setup.totalBudget.toLocaleString()} over ${setup.duration} days`,
+                concept: setup.platforms.map(p => p.name).join(', ') + ' campaign',
+                tagline: autoGeneratedName,
+                heroArtwork: null,
+                accountManagerId: user._id,
+                activities: setup.platforms.map(p => p.name.toLowerCase().replace(/\s+/g, '_')),
+                internalApprovalRequired: false,
+                clientApprovalRequired: false,
+                clientId: selectedClient.id,
+                createdBy: user._id,
+                countries: setup.countries,
+                duration: setup.duration,
+                platforms: setup.platforms,
+                content: setup.content,
+                budgetImpact: budgetImpact,
+                estimatedReach: budgetImpact.estimatedReach,
+                estimatedImpressions: budgetImpact.estimatedImpressions,
+                estimatedClicks: budgetImpact.estimatedClicks,
+                estimatedCtr: budgetImpact.averageCTR,
+                campaignData: setup
+              };
+
+              const response = await fetch('/api/campaigns', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(campaignData)
+              });
+
+              if (response.ok) {
+                console.log(`✅ Campaign for ${setup.countries.join(', ')} auto-saved successfully!`);
+              }
+            } catch (error) {
+              console.error(`❌ Error saving campaign for ${setup.countries.join(', ')}:`, error);
+            }
+          }
+          
+          // Reload campaigns to show in table
+          await loadSavedCampaigns();
+        }
         
         setCountrySetups([...countrySetups, ...newSetups]);
         setSavedSetups([...savedSetups, ...newSetups]);
@@ -452,9 +619,33 @@ const CampaignSetup: React.FC = () => {
             
             {currentSetup.countries.length > 0 && (
               <div className="bg-blue-50 p-4 rounded-lg">
-                <p className="text-sm text-blue-800">
+                <p className="text-sm text-blue-800 mb-2">
                   Selected: {currentSetup.countries.join(', ')}
                 </p>
+                {currentSetup.countries.includes('Saudi Arabia') && (
+                  <div className="text-xs text-green-700 bg-green-50 p-2 rounded border border-green-200 mb-1">
+                    <Brain className="inline w-3 h-3 mr-1" />
+                    <strong>GFH Data:</strong> Saudi Arabia shows strong performance: 1.18% CTR, $0.21 CPC
+                  </div>
+                )}
+                {currentSetup.countries.includes('Oman') && (
+                  <div className="text-xs text-emerald-700 bg-emerald-50 p-2 rounded border border-emerald-200 mb-1">
+                    <Brain className="inline w-3 h-3 mr-1" />
+                    <strong>GFH Insight:</strong> Oman has excellent cost efficiency: 3.01% CTR, $0.071 CPC - highly recommended!
+                  </div>
+                )}
+                {currentSetup.countries.includes('Qatar') && (
+                  <div className="text-xs text-blue-700 bg-blue-50 p-2 rounded border border-blue-200 mb-1">
+                    <Brain className="inline w-3 h-3 mr-1" />
+                    <strong>GFH Data:</strong> Qatar offers good app install performance: $2.80 CPI
+                  </div>
+                )}
+                {currentSetup.countries.length >= 3 && (
+                  <div className="text-xs text-purple-700 bg-purple-50 p-2 rounded border border-purple-200">
+                    <Brain className="inline w-3 h-3 mr-1" />
+                    <strong>Multi-Market Strategy:</strong> Consider A/B testing different creative approaches per market
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -489,10 +680,26 @@ const CampaignSetup: React.FC = () => {
                 <p className="text-green-800 font-medium">
                   Total Campaign Budget: ${currentSetup.totalBudget.toLocaleString()}
                 </p>
-                {currentSetup.totalBudget >= 100 && (
+                {currentSetup.totalBudget >= 100 && currentSetup.countries.length > 0 && (
                   <div className="mt-2 text-sm text-green-700">
-                    <Brain className="inline w-4 h-4 mr-1" />
-                    Quick AI Preview: ~{Math.round(currentSetup.totalBudget * 1000).toLocaleString()} estimated reach
+                    <Database className="inline w-4 h-4 mr-1" />
+                    Quick Data Preview: Based on GFH historical performance data
+                  </div>
+                )}
+                {currentSetup.totalBudget >= 20000 && (
+                  <div className="mt-2 p-2 bg-blue-50 rounded border border-blue-200">
+                    <p className="text-xs text-blue-700">
+                      <Brain className="inline w-3 h-3 mr-1" />
+                      <strong>AI Insight:</strong> High-budget campaigns perform best with Meta + Google combination (based on GFH data)
+                    </p>
+                  </div>
+                )}
+                {currentSetup.totalBudget < 5000 && currentSetup.totalBudget > 0 && (
+                  <div className="mt-2 p-2 bg-yellow-50 rounded border border-yellow-200">
+                    <p className="text-xs text-yellow-700">
+                      <Brain className="inline w-3 h-3 mr-1" />
+                      <strong>AI Tip:</strong> For budget-conscious campaigns, focus on Meta platform for best cost-efficiency
+                    </p>
                   </div>
                 )}
               </div>
@@ -560,9 +767,27 @@ const CampaignSetup: React.FC = () => {
             
             {currentSetup.platforms.length > 0 && (
               <div className="bg-yellow-50 p-4 rounded-lg">
-                <p className="text-sm text-yellow-800">
+                <p className="text-sm text-yellow-800 mb-2">
                   Selected Platforms: {currentSetup.platforms.map(p => p.name).join(', ')}
                 </p>
+                {currentSetup.platforms.some(p => p.name.includes('Meta')) && (
+                  <div className="text-xs text-green-700 bg-green-50 p-2 rounded border border-green-200 mb-1">
+                    <Brain className="inline w-3 h-3 mr-1" />
+                    <strong>GFH Data:</strong> Meta shows 1.90% average CTR and $0.127 CPC in your target markets
+                  </div>
+                )}
+                {currentSetup.platforms.some(p => p.name.includes('Google')) && (
+                  <div className="text-xs text-blue-700 bg-blue-50 p-2 rounded border border-blue-200 mb-1">
+                    <Brain className="inline w-3 h-3 mr-1" />
+                    <strong>GFH Data:</strong> Google UAC excels at app installs with 4.76% CTR
+                  </div>
+                )}
+                {currentSetup.platforms.some(p => p.name === 'LinkedIn') && (
+                  <div className="text-xs text-purple-700 bg-purple-50 p-2 rounded border border-purple-200">
+                    <Brain className="inline w-3 h-3 mr-1" />
+                    <strong>GFH Data:</strong> LinkedIn has lower CTR (0.13%) but targets professional audiences effectively
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -614,6 +839,39 @@ const CampaignSetup: React.FC = () => {
                     </span>
                   )}
                 </p>
+                {getTotalPlatformPercentage() === 100 && currentSetup.totalBudget > 0 && currentSetup.countries.length > 0 && (
+                  <div className="mt-3 p-3 bg-white rounded border border-green-200">
+                    <p className="text-sm font-medium text-gray-700 mb-2 flex items-center">
+                      <Database className="w-4 h-4 mr-2" />
+                      Quick Estimation Preview
+                    </p>
+                    {(() => {
+                      const quickEstimate = calculateDataDrivenEstimates(
+                        currentSetup.totalBudget,
+                        currentSetup.platforms,
+                        currentSetup.countries,
+                        currentSetup.duration || 7,
+                        0
+                      );
+                      return (
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div className="text-gray-600">
+                            <span className="font-medium">Est. Impressions:</span> {quickEstimate.estimatedImpressions.toLocaleString()}
+                          </div>
+                          <div className="text-gray-600">
+                            <span className="font-medium">Est. Clicks:</span> {quickEstimate.estimatedClicks.toLocaleString()}
+                          </div>
+                          <div className="text-gray-600">
+                            <span className="font-medium">Avg CPM:</span> ${quickEstimate.averageCPM.toFixed(2)}
+                          </div>
+                          <div className="text-gray-600">
+                            <span className="font-medium">Avg CPC:</span> ${quickEstimate.averageCPC.toFixed(2)}
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -780,7 +1038,7 @@ const CampaignSetup: React.FC = () => {
                 <p className="text-sm text-purple-800 font-medium mb-2">
                   Selected Content Types ({currentSetup.content.length}):
                 </p>
-                <div className="text-xs text-purple-700 space-y-1">
+                <div className="text-xs text-purple-700 space-y-1 mb-3">
                   {currentSetup.content.map(content => (
                     <div key={content.type}>
                       • {content.type}
@@ -792,6 +1050,24 @@ const CampaignSetup: React.FC = () => {
                     </div>
                   ))}
                 </div>
+                {currentSetup.content.some(c => c.type.includes('Influencer')) && (
+                  <div className="text-xs text-green-700 bg-green-50 p-2 rounded border border-green-200 mb-1">
+                    <Brain className="inline w-3 h-3 mr-1" />
+                    <strong>AI Insight:</strong> Influencer content typically shows +70% engagement boost on Instagram and TikTok
+                  </div>
+                )}
+                {currentSetup.content.some(c => c.type.includes('Last-Chance')) && (
+                  <div className="text-xs text-blue-700 bg-blue-50 p-2 rounded border border-blue-200 mb-1">
+                    <Brain className="inline w-3 h-3 mr-1" />
+                    <strong>GFH Strategy:</strong> Last-chance content performs best in final 2 weeks of campaign
+                  </div>
+                )}
+                {currentSetup.content.length >= 6 && (
+                  <div className="text-xs text-indigo-700 bg-indigo-50 p-2 rounded border border-indigo-200">
+                    <Brain className="inline w-3 h-3 mr-1" />
+                    <strong>Content Strategy:</strong> Good content diversity! Plan to rotate content every 7-10 days for optimal performance
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -803,12 +1079,12 @@ const CampaignSetup: React.FC = () => {
         return (
           <div className="space-y-6">
             <div className="text-center">
-              <Brain className="mx-auto h-12 w-12 text-indigo-600 mb-4" />
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">AI Budget Impact Analysis</h2>
-              <p className="text-gray-600">See what results you can expect from your budget allocation.</p>
+              <Database className="mx-auto h-12 w-12 text-indigo-600 mb-4" />
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">GFH Data-Driven Analysis</h2>
+              <p className="text-gray-600">Predictions based on historical campaign performance data</p>
             </div>
             
-            {/* Confidence Level */}
+            {/* Confidence Level & Data Points */}
             <div className={`p-4 rounded-lg text-center ${
               budgetImpact.confidence === 'high' ? 'bg-green-50 text-green-800' :
               budgetImpact.confidence === 'medium' ? 'bg-yellow-50 text-yellow-800' :
@@ -819,6 +1095,9 @@ const CampaignSetup: React.FC = () => {
                 {budgetImpact.confidence === 'high' && ' ✓'}
                 {budgetImpact.confidence === 'medium' && ' ⚠️'}
                 {budgetImpact.confidence === 'low' && ' ⚡'}
+              </p>
+              <p className="text-sm mt-1">
+                Based on {budgetImpact.dataPoints} historical data points from GFH campaigns
               </p>
             </div>
             
@@ -848,6 +1127,31 @@ const CampaignSetup: React.FC = () => {
                 <p className="text-sm text-gray-600">Conversions</p>
               </div>
             </div>
+
+            {/* Historical Performance Metrics */}
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg border border-blue-200">
+              <h4 className="font-medium text-blue-900 mb-4 flex items-center">
+                <Database className="w-5 h-5 mr-2" />
+                Historical Performance Metrics
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-blue-700">${budgetImpact.averageCPM.toFixed(2)}</p>
+                  <p className="text-sm text-blue-600">Average CPM</p>
+                  <p className="text-xs text-blue-500 mt-1">Cost per 1,000 impressions</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-blue-700">${budgetImpact.averageCPC.toFixed(2)}</p>
+                  <p className="text-sm text-blue-600">Average CPC</p>
+                  <p className="text-xs text-blue-500 mt-1">Cost per click</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-blue-700">{budgetImpact.averageCTR.toFixed(2)}%</p>
+                  <p className="text-sm text-blue-600">Average CTR</p>
+                  <p className="text-xs text-blue-500 mt-1">Click-through rate</p>
+                </div>
+              </div>
+            </div>
             
             {/* Cost Metrics */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -862,11 +1166,11 @@ const CampaignSetup: React.FC = () => {
               </div>
             </div>
             
-            {/* AI Insights */}
+            {/* Data-Driven Insights */}
             <div className="bg-indigo-50 p-6 rounded-lg border border-indigo-200">
               <h4 className="font-medium text-indigo-900 mb-3 flex items-center">
-                <Brain className="w-5 h-5 mr-2" />
-                AI Insights
+                <Database className="w-5 h-5 mr-2" />
+                Data-Driven Insights
               </h4>
               <ul className="space-y-2">
                 {budgetImpact.insights.map((insight, index) => (
@@ -878,11 +1182,11 @@ const CampaignSetup: React.FC = () => {
               </ul>
             </div>
             
-            {/* AI Recommendations */}
+            {/* Strategic Recommendations */}
             <div className="bg-amber-50 p-6 rounded-lg border border-amber-200">
               <h4 className="font-medium text-amber-900 mb-3 flex items-center">
                 <TrendingUp className="w-5 h-5 mr-2" />
-                AI Recommendations
+                Strategic Recommendations
               </h4>
               <ul className="space-y-2">
                 {budgetImpact.recommendations.map((rec, index) => (
@@ -939,8 +1243,8 @@ const CampaignSetup: React.FC = () => {
                 onClick={finishCountrySetup}
                 className="w-full px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium"
               >
-                <Save className="inline w-4 h-4 mr-2" />
-                Save This Setup
+                <CheckCircle className="inline w-4 h-4 mr-2" />
+                Save Campaign to Database & Table
               </button>
               
               {remainingCountries.length > 0 && (
@@ -948,8 +1252,8 @@ const CampaignSetup: React.FC = () => {
                   onClick={copyPreviousSetup}
                   className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
                 >
-                  <RotateCcw className="inline w-4 h-4 mr-2" />
-                  Save & Apply to All Remaining Countries ({remainingCountries.length})
+                  <CheckCircle className="inline w-4 h-4 mr-2" />
+                  Save {remainingCountries.length} Campaigns to Database & Table
                 </button>
               )}
               
@@ -985,7 +1289,121 @@ const CampaignSetup: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Saved Campaigns Table - ALWAYS VISIBLE */}
+        <div className="mb-8 bg-white rounded-xl shadow-lg overflow-hidden">
+          <div className="px-6 py-4 bg-green-600">
+            <h2 className="text-xl font-bold text-white flex items-center">
+              <Database className="w-6 h-6 mr-2" />
+              All Saved Campaigns ({savedCampaigns.length})
+            </h2>
+            <p className="text-green-100 text-sm">All your created campaigns appear in this table</p>
+          </div>
+          
+          {savedCampaigns.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Campaign Name
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Countries
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Budget
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Duration
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Platforms
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Est. Reach
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Est. Impressions
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Est. Clicks
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Created
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {savedCampaigns.map((campaign) => (
+                    <tr key={campaign.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">{campaign.name}</div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-600">
+                          {campaign.countries.length > 0 ? campaign.countries.join(', ') : 'N/A'}
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-green-600">
+                          ${campaign.totalBudget.toLocaleString()}
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-600">{campaign.duration} days</div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-600">
+                          {campaign.platforms.length > 0 ? campaign.platforms.map(p => p.name).join(', ') : 'N/A'}
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-blue-600">
+                          {campaign.budgetImpact?.estimatedReach?.toLocaleString() || 'N/A'}
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-purple-600">
+                          {campaign.budgetImpact?.estimatedImpressions?.toLocaleString() || 'N/A'}
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-orange-600">
+                          {campaign.budgetImpact?.estimatedClicks?.toLocaleString() || 'N/A'}
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-600">
+                          {campaign.createdAt ? new Date(campaign.createdAt).toLocaleDateString() : 'N/A'}
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          campaign.status === 'active' 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {campaign.status || 'Active'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="px-6 py-12 text-center">
+              <Database className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No campaigns created yet</h3>
+              <p className="text-gray-600">Create your first campaign using the form below and it will appear here.</p>
+            </div>
+          )}
+        </div>
+
         <div className="bg-white rounded-xl shadow-lg overflow-hidden">
           <div className="px-6 py-4 bg-gradient-to-r from-blue-600 to-purple-600">
             <h1 className="text-2xl font-bold text-white">Campaign Setup Form</h1>
@@ -1041,7 +1459,87 @@ const CampaignSetup: React.FC = () => {
             </button>
           </div>
         </div>
+
+        {/* Create Campaign Section */}
+        {currentStep === 10 && currentSetup.countries.length > 0 && (
+          <div className="mt-8 bg-white rounded-xl shadow-lg overflow-hidden">
+            <div className="px-6 py-4 bg-green-600">
+              <h2 className="text-xl font-bold text-white flex items-center">
+                <Plus className="w-6 h-6 mr-2" />
+                Create Campaign
+              </h2>
+            </div>
+            <div className="px-6 py-6">
+              <div className="mb-4">
+                <label htmlFor="campaignName" className="block text-sm font-medium text-gray-700 mb-2">
+                  Campaign Name *
+                </label>
+                <input
+                  type="text"
+                  id="campaignName"
+                  value={campaignName}
+                  onChange={(e) => setCampaignName(e.target.value)}
+                  placeholder="Enter campaign name..."
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                />
+              </div>
+              
+              <div className="bg-gray-50 p-4 rounded-lg mb-4">
+                <h4 className="font-medium text-gray-900 mb-2">Campaign Summary</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600">
+                  <div>
+                    <strong>Countries:</strong> {currentSetup.countries.join(', ')}
+                  </div>
+                  <div>
+                    <strong>Budget:</strong> ${currentSetup.totalBudget.toLocaleString()}
+                  </div>
+                  <div>
+                    <strong>Duration:</strong> {currentSetup.duration} days
+                  </div>
+                  <div>
+                    <strong>Platforms:</strong> {currentSetup.platforms.map(p => p.name).join(', ')}
+                  </div>
+                </div>
+              </div>
+
+              <button
+                onClick={saveCampaignToBackend}
+                disabled={!campaignName.trim() || isCreatingCampaign}
+                className="w-full px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium flex items-center justify-center"
+              >
+                {isCreatingCampaign ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
+                    Creating Campaign...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="w-5 h-5 mr-2" />
+                    Create Campaign
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+
+
         
+        {/* Campaign Assistant - Always visible when setup is in progress */}
+        {(currentStep > 1 || currentSetup.countries.length > 0) && (
+          <div className="mt-8">
+            <CampaignAssistantComponent
+              budget={currentSetup.totalBudget}
+              duration={currentSetup.duration}
+              countries={currentSetup.countries}
+              platforms={currentSetup.platforms.map(p => p.name)}
+              objectives={currentSetup.platforms.flatMap(p => Object.keys(p.campaignTypes))}
+              contentSelected={currentSetup.content.map(c => c.type)}
+              onRecommendationApply={handleRecommendationApply}
+            />
+          </div>
+        )}
+
         {/* Saved Setups */}
         {savedSetups.length > 0 && (
           <div className="mt-8 bg-white rounded-xl shadow-lg overflow-hidden">
@@ -1080,12 +1578,15 @@ const CampaignSetup: React.FC = () => {
                     {setup.budgetImpact && (
                       <div className="mt-2 p-3 bg-gradient-to-r from-indigo-50 to-purple-50 rounded border border-indigo-200">
                         <p className="text-xs font-medium text-indigo-700 mb-2 flex items-center">
-                          <Brain className="w-3 h-3 mr-1" />
-                          AI Impact Analysis
+                          <Database className="w-3 h-3 mr-1" />
+                          GFH Data Analysis ({setup.budgetImpact.dataPoints || 0} data points)
                         </p>
                         <div className="grid grid-cols-2 gap-2 text-xs">
                           <div className="text-gray-600">
                             <span className="font-medium">Reach:</span> {setup.budgetImpact.estimatedReach.toLocaleString()}
+                          </div>
+                          <div className="text-gray-600">
+                            <span className="font-medium">Impressions:</span> {setup.budgetImpact.estimatedImpressions.toLocaleString()}
                           </div>
                           <div className="text-gray-600">
                             <span className="font-medium">Clicks:</span> {setup.budgetImpact.estimatedClicks.toLocaleString()}
@@ -1093,8 +1594,16 @@ const CampaignSetup: React.FC = () => {
                           <div className="text-gray-600">
                             <span className="font-medium">Conversions:</span> {setup.budgetImpact.estimatedConversions.toLocaleString()}
                           </div>
+                        </div>
+                        <div className="grid grid-cols-3 gap-1 mt-2 text-xs">
                           <div className="text-gray-600">
-                            <span className="font-medium">CPC:</span> ${setup.budgetImpact.costPerClick}
+                            <span className="font-medium">CPM:</span> ${setup.budgetImpact.averageCPM?.toFixed(2) || 'N/A'}
+                          </div>
+                          <div className="text-gray-600">
+                            <span className="font-medium">CPC:</span> ${setup.budgetImpact.averageCPC?.toFixed(2) || setup.budgetImpact.costPerClick}
+                          </div>
+                          <div className="text-gray-600">
+                            <span className="font-medium">CTR:</span> {setup.budgetImpact.averageCTR?.toFixed(2) || 'N/A'}%
                           </div>
                         </div>
                         <div className={`mt-2 px-2 py-1 rounded text-xs text-center ${

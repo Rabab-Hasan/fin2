@@ -3,7 +3,6 @@ import { useQuery } from '@tanstack/react-query';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Trophy, Info, Award, Target, TrendingUp, Star, Medal, Crown } from 'lucide-react';
 import Card from './Card';
-import { useClient } from '../contexts/ClientContext';
 
 const METRICS = [
   { key: 'registered_onboarded', label: 'Registered Onboarded', icon: Target, color: '#3B82F6' },
@@ -18,11 +17,10 @@ const METRICS = [
 
 // Analytics API calls
 const analyticsApi = {
-  getBestMonth: async (params: any, clientId: string) => {
+  getBestMonth: async (params: any) => {
     const searchParams = new URLSearchParams();
     if (params.metric) searchParams.append('metric', params.metric);
     if (params.weeks) searchParams.append('weeks', params.weeks);
-    searchParams.append('clientId', clientId);
     
     const response = await fetch(`/api/analytics/best-month?${searchParams}`);
     if (!response.ok) throw new Error('Failed to fetch best month analysis');
@@ -99,22 +97,17 @@ const NotesSection = ({ notes }: {
 };
 
 const BestMonthAnalysis: React.FC = () => {
-  const { selectedClient } = useClient();
   const [selectedMetric, setSelectedMetric] = useState('total_advance_applicants');
   const [selectedWeeks, setSelectedWeeks] = useState('all');
   const [showTooltip, setShowTooltip] = useState(false);
   const [viewMode, setViewMode] = useState<'leaderboard' | 'analysis'>('leaderboard');
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['best-month', selectedMetric, selectedWeeks, selectedClient?.id],
-    queryFn: () => {
-      if (!selectedClient?.id) return null;
-      return analyticsApi.getBestMonth({
-        metric: selectedMetric,
-        weeks: selectedWeeks
-      }, selectedClient.id);
-    },
-    enabled: !!selectedClient?.id
+    queryKey: ['best-month', selectedMetric, selectedWeeks],
+    queryFn: () => analyticsApi.getBestMonth({
+      metric: selectedMetric,
+      weeks: selectedWeeks
+    })
   });
 
   // Fetch all notes

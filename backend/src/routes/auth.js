@@ -1,9 +1,8 @@
 const express = require('express');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { ObjectId } = require('mongodb');
 const { getDb } = require('../database-mongo');
-const encryption = require('../utils/encryption');
 
 const router = express.Router();
 
@@ -29,30 +28,15 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    // Check password using encryption service
+    // Check password
     let isValidPassword = false;
     
-    try {
-      // If password is hashed with bcrypt, compare with bcrypt
-      if (user.password && user.password.startsWith('$')) {
-        isValidPassword = await encryption.verifyPassword(password, user.password);
-      } else {
-        // If password is plain text (migrate to hashed)
-        isValidPassword = password === user.password;
-        
-        // Auto-migrate plain text password to hashed
-        if (isValidPassword) {
-          const hashedPassword = await encryption.hashPassword(password);
-          await usersCollection.updateOne(
-            { _id: user._id },
-            { $set: { password: hashedPassword } }
-          );
-          console.log('🔒 Migrated plain text password to encrypted hash for:', user.email);
-        }
-      }
-    } catch (error) {
-      console.error('Password verification error:', error);
-      return res.status(500).json({ error: 'Authentication error' });
+    // If password is hashed, compare with bcrypt
+    if (user.password && user.password.startsWith('$')) {
+      isValidPassword = await bcrypt.compare(password, user.password);
+    } else {
+      // If password is plain text (not recommended for production)
+      isValidPassword = password === user.password;
     }
 
     if (!isValidPassword) {
@@ -67,22 +51,14 @@ router.post('/login', async (req, res) => {
       hasUserType: user.hasOwnProperty('user_type')
     });
 
-    // Generate encrypted JWT token
-    const tokenPayload = { 
-      userId: user._id,
-      email: user.email,
-      name: user.name || user.username,
-      user_type: user.user_type || 'employee',
-      association: user.association || null
-    };
-    
-    // Encrypt the payload before signing
-    const encryptedPayload = encryption.encryptJWTPayload(tokenPayload);
-    
+    // Generate JWT token
     const token = jwt.sign(
       { 
-        data: encryptedPayload,
-        iat: Math.floor(Date.now() / 1000)
+        userId: user._id,
+        email: user.email,
+        name: user.name || user.username,
+        user_type: user.user_type || 'employee',
+        association: user.association || null
       },
       JWT_SECRET,
       { expiresIn: '24h' }
@@ -394,20 +370,12 @@ function authenticateToken(req, res, next) {
     return res.status(401).json({ error: 'Access token required' });
   }
 
-  jwt.verify(token, JWT_SECRET, (err, decodedToken) => {
+  jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) {
       return res.status(403).json({ error: 'Invalid or expired token' });
     }
-    
-    try {
-      // Decrypt the payload from the token
-      const decryptedPayload = encryption.decryptJWTPayload(decodedToken.data);
-      req.user = decryptedPayload;
-      next();
-    } catch (decryptError) {
-      console.error('Token decryption error:', decryptError);
-      return res.status(403).json({ error: 'Invalid token format' });
-    }
+    req.user = user;
+    next();
   });
 }
 
@@ -443,8 +411,8 @@ router.post('/users', authenticateToken, async (req, res) => {
       return res.status(409).json({ error: 'User with this email already exists' });
     }
 
-    // Hash password using encryption service
-    const hashedPassword = await encryption.hashPassword(password);
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
 
     // Create new user
     const newUser = {

@@ -22,6 +22,8 @@ const NavBar: React.FC = () => {
   ];
 
   const labsNavItem = { path: '/labs', label: 'Action Labs', icon: FlaskConical };
+  const gfhTestItem = { path: '/gfh-test', label: 'GFH Data Test', icon: Database };
+  const vectorTestItem = { path: '/vector-test', label: 'Vector DB Test', icon: Database };
 
   // Build navigation items based on user type
   let navItems = [];
@@ -41,6 +43,8 @@ const NavBar: React.FC = () => {
           user?.user_type === 'employee' || 
           !user?.user_type ? adminNavItems : []),
       labsNavItem,
+      gfhTestItem,
+      vectorTestItem,
     ];
   }
 

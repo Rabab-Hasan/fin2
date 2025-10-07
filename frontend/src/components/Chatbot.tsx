@@ -31,6 +31,46 @@ const Chatbot: React.FC<ChatbotProps> = ({ isVisible = false, onToggle }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Voice recording state
+  const [isRecording, setIsRecording] = useState(false);
+  const recognitionRef = useRef<any>(null);
+
+  // Start voice recording (speech-to-text)
+  const startRecording = () => {
+    if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+      alert('Speech recognition is not supported in this browser.');
+      return;
+    }
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    recognition.onstart = () => setIsRecording(true);
+    recognition.onend = () => setIsRecording(false);
+    recognition.onerror = (event: any) => {
+      setIsRecording(false);
+      alert('Speech recognition error: ' + event.error);
+    };
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setInputText(transcript);
+      setIsRecording(false);
+      // Optionally auto-send after recording:
+      // sendMessage();
+    };
+    recognitionRef.current = recognition;
+    recognition.start();
+  };
+
+  // Stop voice recording
+  const stopRecording = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      setIsRecording(false);
+    }
+  };
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -447,9 +487,9 @@ Assistant:`,
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder="Ask me about campaigns, budgets, platforms..."
+                placeholder={isRecording ? "Listening..." : "Ask me about campaigns, budgets, platforms..."}
                 className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                disabled={isLoading}
+                disabled={isLoading || isRecording}
               />
               <button
                 onClick={sendMessage}
@@ -457,6 +497,18 @@ Assistant:`,
                 className="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 <Send className="w-4 h-4" />
+              </button>
+              <button
+                onClick={isRecording ? stopRecording : startRecording}
+                disabled={isLoading}
+                className={`p-2 rounded-lg ${isRecording ? 'bg-red-500 text-white animate-pulse' : 'bg-gray-200 text-gray-700 hover:bg-blue-100'} transition-colors`}
+                title={isRecording ? "Stop recording" : "Record voice"}
+              >
+                {isRecording ? (
+                  <span role="img" aria-label="Recording">🎤...</span>
+                ) : (
+                  <span role="img" aria-label="Record">🎤</span>
+                )}
               </button>
             </div>
             <div className="flex justify-between items-center mt-2">

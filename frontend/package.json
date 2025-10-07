@@ -7,8 +7,11 @@
     "@types/node": "^16.18.0",
     "@types/react-beautiful-dnd": "^13.1.8",
     "@types/react-dropzone": "^4.2.2",
+    "@xenova/transformers": "^2.17.2",
     "crypto-js": "^4.2.0",
+    "fuse.js": "^7.1.0",
     "lucide-react": "^0.287.0",
+    "papaparse": "^5.5.3",
     "react": "^18.2.0",
     "react-beautiful-dnd": "^13.1.1",
     "react-dom": "^18.2.0",
@@ -16,7 +19,8 @@
     "react-router-dom": "^6.8.1",
     "react-scripts": "5.0.1",
     "recharts": "^3.2.0",
-    "typescript": "^4.9.0"
+    "typescript": "^4.9.0",
+    "vectordb-js": "^1.0.1"
   },
   "scripts": {
     "start": "react-scripts start",

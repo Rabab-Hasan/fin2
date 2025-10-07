@@ -10,6 +10,8 @@ import AccessPage from './pages/AccessPage';
 import CampaignSetup from './pages/CampaignSetup';
 import TikTokAuthCallback from './pages/TikTokAuthCallback';
 import MetaAuthCallback from './pages/MetaAuthCallback';
+import GFHTestValidation from './components/GFHTestValidation';
+import VectorDatabaseTest from './components/VectorDatabaseTest';
 
 import ProtectedRoute from './components/ProtectedRoute';
 import RouteProtector from './components/RouteProtector';
@@ -65,6 +67,16 @@ function App() {
                     <Route path="/labs" element={
                       <RouteProtector allowedRoutes={[]}>
                         <Labs />
+                      </RouteProtector>
+                    } />
+                    <Route path="/gfh-test" element={
+                      <RouteProtector allowedRoutes={[]}>
+                        <GFHTestValidation />
+                      </RouteProtector>
+                    } />
+                    <Route path="/vector-test" element={
+                      <RouteProtector allowedRoutes={[]}>
+                        <VectorDatabaseTest />
                       </RouteProtector>
                     } />
                   </Routes>
