@@ -4,6 +4,14 @@ const jwt = require('jsonwebtoken');
 const { Database } = require('sqlite3').verbose();
 const path = require('path');
 
+// Import encryption utilities
+const encryption = require('../utils/encryption');
+const databaseEncryption = require('../middleware/database-encryption');
+const { decryptRequest, decryptFormData, logAuthentication, createRateLimiter } = require('../middleware/security');
+
+// Rate limiter for auth endpoints
+const authRateLimit = createRateLimiter(15 * 60 * 1000, 5); // 5 attempts per 15 minutes
+
 const router = express.Router();
 
 // JWT secret (in production, use environment variable)
@@ -64,7 +72,10 @@ const verifyToken = (req, res, next) => {
 };
 
 // POST /api/auth/login - User login
-router.post('/login', async (req, res) => {
+router.post('/login', 
+  authRateLimit,
+  logAuthentication,
+  async (req, res) => {
   const db = getDb();
   
   try {
@@ -74,59 +85,60 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
-    // Find user by email
-    const user = await dbGet(db, 'SELECT * FROM users WHERE email = ?', [email.toLowerCase()]);
+    // Find user by encrypted email (try both encrypted and plain for migration)
+    let user = await dbGet(db, 'SELECT * FROM users WHERE email = ?', [email.toLowerCase()]);
+    
+    // If not found with plain email, try searching for encrypted emails
+    if (!user) {
+      const encryptedEmail = encryption.encryptDatabaseField(email.toLowerCase());
+      user = await dbGet(db, 'SELECT * FROM users WHERE email = ?', [encryptedEmail]);
+    }
     
     if (!user) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    // Check password
-    let isValidPassword = false;
-    
-    // If password is hashed, compare with bcrypt
-    if (user.password && user.password.startsWith('$')) {
-      isValidPassword = await bcrypt.compare(password, user.password);
-    } else {
-      // If password is plain text (not recommended for production)
-      isValidPassword = password === user.password;
-    }
+    // Decrypt user data
+    const decryptedUser = databaseEncryption.decryptFromSQLite('users', user);
+
+    // Verify password using encryption service
+    const isValidPassword = await databaseEncryption.verifyPassword(password, user.password);
 
     if (!isValidPassword) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    // Debug logging for user data
+    // Debug logging for user data (use hashed values for security)
     console.log('🔍 User login data:', {
-      email: user.email,
-      user_type: user.user_type,
-      association: user.association,
-      hasUserType: user.hasOwnProperty('user_type')
+      email: encryption.hashIdentifier(decryptedUser.email),
+      user_type: decryptedUser.user_type,
+      association: decryptedUser.association,
+      hasUserType: decryptedUser.hasOwnProperty('user_type')
     });
 
-    // Generate JWT token
+    // Generate JWT token with decrypted user data
     const token = jwt.sign(
       { 
-        userId: user.id,
-        email: user.email,
-        name: user.name,
-        user_type: user.user_type || 'employee',
-        association: user.association || null
+        userId: decryptedUser.id,
+        email: decryptedUser.email,
+        name: decryptedUser.name,
+        user_type: decryptedUser.user_type || 'employee',
+        association: decryptedUser.association || null
       },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
 
-    // Remove password from user object before sending response
+    // Remove password from user object before sending response (use decrypted data)
     const userWithoutPassword = {
-      _id: user.id, // Keep _id for compatibility
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      user_type: user.user_type || 'employee',
-      association: user.association,
-      createdAt: user.created_at,
-      updatedAt: user.updated_at
+      _id: decryptedUser.id, // Keep _id for compatibility
+      id: decryptedUser.id,
+      email: decryptedUser.email,
+      name: decryptedUser.name,
+      user_type: decryptedUser.user_type || 'employee',
+      association: decryptedUser.association,
+      createdAt: decryptedUser.created_at,
+      updatedAt: decryptedUser.updated_at
     };
 
     res.json({
@@ -143,7 +155,10 @@ router.post('/login', async (req, res) => {
 });
 
 // POST /api/auth/register - User registration
-router.post('/register', async (req, res) => {
+router.post('/register',
+  authRateLimit,
+  logAuthentication,
+  async (req, res) => {
   const db = getDb();
   
   try {
@@ -160,19 +175,30 @@ router.post('/register', async (req, res) => {
       return res.status(409).json({ error: 'User already exists' });
     }
 
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
+    // Hash password using encryption service
+    const hashedPassword = await databaseEncryption.encryptPassword(password);
 
-    // Create new user
+    // Encrypt sensitive user data
+    const userData = {
+      email: email.toLowerCase(),
+      password: hashedPassword,
+      name: name || email.split('@')[0],
+      user_type: 'employee',
+      association: null
+    };
+    
+    const encryptedUserData = databaseEncryption.encryptForSQLite('users', userData);
+
+    // Create new user with encrypted data
     const result = await dbRun(db, `
       INSERT INTO users (email, password, name, user_type, association)
       VALUES (?, ?, ?, ?, ?)
     `, [
-      email.toLowerCase(),
-      hashedPassword,
-      name || email.split('@')[0],
-      'employee',
-      null
+      encryptedUserData.email,
+      encryptedUserData.password,
+      encryptedUserData.name,
+      encryptedUserData.user_type,
+      encryptedUserData.association
     ]);
 
     // Generate JWT token
@@ -188,16 +214,18 @@ router.post('/register', async (req, res) => {
       { expiresIn: '7d' }
     );
 
-    // Get the created user
+    // Get the created user and decrypt sensitive data
     const newUser = await dbGet(db, 'SELECT * FROM users WHERE id = ?', [result.id]);
+    const decryptedUser = databaseEncryption.decryptFromSQLite('users', newUser);
+    
     const userWithoutPassword = {
-      _id: newUser.id,
-      id: newUser.id,
-      email: newUser.email,
-      name: newUser.name,
-      user_type: newUser.user_type,
-      association: newUser.association,
-      createdAt: newUser.created_at,
+      _id: decryptedUser.id,
+      id: decryptedUser.id,
+      email: decryptedUser.email,
+      name: decryptedUser.name,
+      user_type: decryptedUser.user_type,
+      association: decryptedUser.association,
+      createdAt: decryptedUser.created_at,
       updatedAt: newUser.updated_at
     };
 

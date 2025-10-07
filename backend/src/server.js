@@ -4,13 +4,21 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs-extra');
 
+// Import security middleware
+const { securityHeaders, logAuthentication } = require('./middleware/security');
+const databaseEncryption = require('./middleware/database-encryption');
+
 const app = express();
 const PORT = 2345;
 
-// Middleware
+// Security middleware
+app.use(securityHeaders);
+app.use(logAuthentication);
+
+// Standard middleware
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Ensure uploads directory exists
 fs.ensureDirSync('uploads');
@@ -58,9 +66,31 @@ app.use('/api/notifications', require('./routes/notifications'));
 // Initialize KNIME integration routes (chatbot fallback)
 app.use('/api/knime', require('./routes/knime'));
 
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+// Health check with encryption status
+app.get('/api/health', async (req, res) => {
+  try {
+    const encryptionStatus = await databaseEncryption.validateEncryptionSetup();
+    
+    res.json({
+      status: 'OK',
+      timestamp: new Date().toISOString(),
+      encryption: {
+        available: true,
+        validated: encryptionStatus,
+        version: '1.0.0'
+      },
+      server: {
+        port: PORT,
+        environment: process.env.NODE_ENV || 'development'
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'ERROR',
+      error: 'Health check failed',
+      encryption: { available: false, validated: false }
+    });
+  }
 });
 
 // Error handling middleware
@@ -79,14 +109,23 @@ app.use('*', (req, res) => {
 
 // Start server
 app.listen(PORT, '0.0.0.0', async () => {
-  console.log(`Finance Dashboard Backend running on port ${PORT}`);
-  console.log(`Health check: http://localhost:${PORT}/api/health`);
-  console.log(`Network access: http://192.168.100.137:${PORT}/api/health`);
+  console.log(`🚀 Finance Dashboard Backend running on port ${PORT}`);
+  console.log(`🏥 Health check: http://localhost:${PORT}/api/health`);
+  console.log(`🌐 Network access: http://192.168.100.137:${PORT}/api/health`);
+  
+  // Validate encryption setup
+  console.log('🔒 Validating encryption system...');
+  const encryptionValid = await databaseEncryption.validateEncryptionSetup();
+  if (encryptionValid) {
+    console.log('✅ Encryption system ready');
+  } else {
+    console.warn('⚠️  Encryption validation failed - check configuration');
+  }
   
   // Initialize SQLite database
   try {
-    console.log('Using SQLite database for development');
-    console.log('📊 All data will be stored in SQLite database');
+    console.log('📊 Using SQLite database for development');
+    console.log('� Sensitive data will be encrypted automatically');
     
   } catch (error) {
     console.error('❌ Error with database setup:', error);

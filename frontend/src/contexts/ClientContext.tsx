@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import clientEncryption from '../utils/encryption';
 
 // Client interface
 export interface Client {
@@ -30,17 +31,17 @@ export const ClientProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [clients, setClients] = useState<Client[]>([]);
   const [isLoadingClients, setIsLoadingClients] = useState(false);
 
-  // Load selected client from localStorage on mount
+  // Load selected client from encrypted storage on mount
   useEffect(() => {
-    const savedClientId = localStorage.getItem('selectedClientId');
-    const savedClients = localStorage.getItem('clients');
+    const savedClientData = clientEncryption.getSecureClientSelection();
+    const savedClients = clientEncryption.getSecureItem('clients_list');
     
     if (savedClients) {
-      const parsedClients = JSON.parse(savedClients);
-      setClients(parsedClients);
+      setClients(savedClients);
       
-      if (savedClientId) {
-        const client = parsedClients.find((c: Client) => c.id === savedClientId);
+      if (savedClientData) {
+        // Validate that the saved client still exists in the list
+        const client = savedClients.find((c: Client) => c.id === savedClientData.id);
         if (client) {
           setSelectedClient(client);
         }
@@ -48,19 +49,19 @@ export const ClientProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   }, []);
 
-  // Save selected client to localStorage when it changes
+  // Save selected client to encrypted storage when it changes
   useEffect(() => {
     if (selectedClient) {
-      localStorage.setItem('selectedClientId', selectedClient.id);
+      clientEncryption.setSecureClientSelection(selectedClient);
     } else {
-      localStorage.removeItem('selectedClientId');
+      clientEncryption.removeSecureItem('selected_client');
     }
   }, [selectedClient]);
 
-  // Save clients to localStorage when they change
+  // Save clients to encrypted storage when they change
   useEffect(() => {
     if (clients.length > 0) {
-      localStorage.setItem('clients', JSON.stringify(clients));
+      clientEncryption.setSecureItem('clients_list', clients);
     }
   }, [clients]);
 

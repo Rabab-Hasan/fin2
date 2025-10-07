@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff, Lock, Mail, LogIn } from 'lucide-react';
+import secureApiClient from '../utils/secure-api-client';
 
 const API_BASE = process.env.NODE_ENV === 'production' 
   ? `${window.location.protocol}//${window.location.hostname}:2345`
@@ -34,25 +35,14 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
     setError('');
 
     try {
-      const response = await fetch(`${API_BASE}/api/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
-      });
+      // Use secure API client with encryption
+      const data = await secureApiClient.login(formData.email, formData.password);
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Login failed');
+      if (!data.token) {
+        throw new Error('Login failed - no token received');
       }
 
-      // Store token in localStorage
-      localStorage.setItem('authToken', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
-
-      // Call onLogin callback
+      // Call onLogin callback (secure storage handled by secureApiClient)
       onLogin(data.token, data.user);
 
     } catch (err) {

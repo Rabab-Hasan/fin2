@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import clientEncryption from '../utils/encryption';
 
 const API_BASE = process.env.NODE_ENV === 'production' 
   ? `${window.location.protocol}//${window.location.hostname}:2345`
@@ -45,28 +46,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check for stored auth data on app load
-    const storedToken = localStorage.getItem('authToken');
-    const storedUser = localStorage.getItem('user');
-
+    // Check for stored auth data on app load using secure storage
+    const storedToken = clientEncryption.getSecureToken();
+    const storedUser = clientEncryption.getSecureItem('user_data');
+    
     if (storedToken && storedUser) {
       try {
-        const parsedUser = JSON.parse(storedUser);
         setToken(storedToken);
-        setUser(parsedUser);
+        setUser(storedUser);
         
         // Optionally verify token with backend
         verifyToken(storedToken);
       } catch (error) {
-        console.error('Error parsing stored user data:', error);
+        console.error('Error loading stored user data:', error);
         logout();
       }
     }
     
     setIsLoading(false);
-  }, []);
-
-  const verifyToken = async (authToken: string) => {
+  }, []);  const verifyToken = async (authToken: string) => {
     try {
       const response = await fetch(`${API_BASE}/api/auth/me`, {
         headers: {
@@ -120,8 +118,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const login = (authToken: string, userData: User) => {
     setToken(authToken);
     setUser(userData);
-    localStorage.setItem('authToken', authToken);
-    localStorage.setItem('user', JSON.stringify(userData));
+    
+    // Store data securely using encryption
+    clientEncryption.setSecureToken(authToken);
+    clientEncryption.setSecureItem('user_data', userData);
     
     // Check access after login
     checkAccess();
@@ -131,6 +131,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setToken(null);
     setUser(null);
     setAccessInfo(null);
+    
+    // Clear encrypted storage
+    clientEncryption.clearUserData();
+    
+    // Also clear legacy localStorage for migration
     localStorage.removeItem('authToken');
     localStorage.removeItem('user');
   };
