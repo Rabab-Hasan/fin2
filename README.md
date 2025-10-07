@@ -2,6 +2,8 @@
 
 A comprehensive business data management and analytics platform with React frontend and Node.js backend.
 
+> **🚀 Latest Update**: GFH Vector Database System - Search through ALL campaign data with natural language queries!
+
 ## Features
 
 - **Smart Data Import**: Excel/CSV import with header normalization and JSONB merge upserts
