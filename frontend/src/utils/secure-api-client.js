@@ -1,10 +1,10 @@
 // Secure API client with encryption support
 import clientEncryption from './encryption.js';
 
-// Use Netlify Functions for production, localhost for development
+// Use Render backend for production, localhost for development
 const API_BASE = process.env.REACT_APP_API_URL || 
   (process.env.NODE_ENV === 'production' 
-    ? '/.netlify/functions' 
+    ? 'https://fin2-4.onrender.com' 
     : 'http://localhost:2345');
 
 class SecureApiClient {

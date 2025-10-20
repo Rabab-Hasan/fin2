@@ -15,8 +15,17 @@ const PORT = process.env.PORT || 2345;
 app.use(securityHeaders);
 app.use(logAuthentication);
 
-// Standard middleware
-app.use(cors());
+// CORS configuration for Netlify frontend
+app.use(cors({
+  origin: [
+    'https://findashr.netlify.app',
+    'http://localhost:3000',
+    'http://localhost:2345'
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Encrypted']
+}));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
