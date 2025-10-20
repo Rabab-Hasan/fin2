@@ -9,7 +9,7 @@ const { securityHeaders, logAuthentication } = require('./middleware/security');
 const databaseEncryption = require('./middleware/database-encryption');
 
 const app = express();
-const PORT = 2345;
+const PORT = process.env.PORT || 2345;
 
 // Security middleware
 app.use(securityHeaders);

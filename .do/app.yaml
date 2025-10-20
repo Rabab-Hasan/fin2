@@ -1,0 +1,59 @@
+# DigitalOcean App Platform Configuration (.do/app.yaml)
+# This file can be used to deploy via doctl CLI or imported in App Platform
+
+name: finance-dashboard
+services:
+- name: backend
+  source_dir: /backend
+  github:
+    repo: your-username/finance-dashboard
+    branch: main
+  run_command: npm start
+  build_command: npm install --production --no-audit
+  environment_slug: node-js
+  instance_count: 1
+  instance_size_slug: basic-xxs
+  routes:
+  - path: /api
+  envs:
+  - key: NODE_ENV
+    value: production
+  - key: PORT
+    value: "8080"
+  - key: JWT_SECRET
+    value: your-jwt-secret-here
+    type: SECRET
+  - key: ENCRYPTION_KEY
+    value: your-encryption-key-here
+    type: SECRET
+  - key: DB_TYPE
+    value: sqlite
+  - key: SQLITE_PATH
+    value: ./data/finance_dashboard.db
+
+- name: frontend
+  source_dir: /frontend
+  github:
+    repo: your-username/finance-dashboard
+    branch: main
+  build_command: npm install && npm run build
+  environment_slug: node-js
+  instance_count: 1
+  instance_size_slug: basic-xxs
+  output_dir: build
+  routes:
+  - path: /
+  envs:
+  - key: REACT_APP_API_URL
+    value: ${backend.PUBLIC_URL}
+  - key: REACT_APP_ENVIRONMENT
+    value: production
+  - key: GENERATE_SOURCEMAP
+    value: "false"
+
+# Optional: Add a database if needed
+# databases:
+# - name: finance-db
+#   engine: PG
+#   version: "13"
+#   size: basic

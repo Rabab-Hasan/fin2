@@ -224,7 +224,172 @@ npm start
 
 ### Platform-Specific Deployment
 
-#### 📦 **Vercel** (Recommended for Frontend + Serverless API)
+#### 🌊 **DigitalOcean App Platform** (Recommended for Full-Stack Apps)
+
+##### Project Structure for DigitalOcean
+Ensure your repository follows this structure:
+```
+/finance-dashboard
+  /frontend        # React frontend
+    - package.json
+    - .env.example
+  /backend         # Node.js backend  
+    - package.json
+    - .env.example
+  Procfile        # App Platform deployment configuration
+  README.md
+```
+
+##### Step 1: Prepare Repository for Deployment
+1. **Ensure all dependencies are properly listed** in respective `package.json` files
+2. **Copy environment examples to production files**:
+   ```bash
+   # Backend
+   cp backend/.env.example backend/.env
+   # Frontend  
+   cp frontend/.env.example frontend/.env
+   ```
+3. **Update environment variables** in both `.env` files with production values
+
+##### Step 2: Create App on DigitalOcean App Platform
+1. Go to [DigitalOcean App Platform](https://cloud.digitalocean.com/apps)
+2. Click **"Create App"**
+3. Choose **GitHub** and select your repository
+4. Select the **main** branch for deployment
+
+##### Step 3: Configure Backend (Node.js API)
+**App Component Settings:**
+- **Component Type**: Web Service
+- **Source Directory**: `/backend`
+- **Build Command**: `npm install --production`
+- **Start Command**: `npm start`
+- **Port**: `8080` (App Platform automatically sets PORT env var)
+
+**Environment Variables for Backend:**
+```env
+NODE_ENV=production
+JWT_SECRET=your-super-secure-jwt-secret-key-here
+ENCRYPTION_KEY=your-32-character-encryption-key-here
+FRONTEND_URL=https://your-frontend-app.ondigitalocean.app
+ALLOWED_ORIGINS=https://your-frontend-app.ondigitalocean.app
+DB_TYPE=sqlite
+SQLITE_PATH=./data/finance_dashboard.db
+UPLOAD_MAX_SIZE=10485760
+SECURITY_LEVEL=production
+```
+
+##### Step 4: Configure Frontend (React Static Site)
+**App Component Settings:**
+- **Component Type**: Static Site
+- **Source Directory**: `/frontend`  
+- **Build Command**: `npm install && npm run build`
+- **Output Directory**: `build`
+
+**Environment Variables for Frontend:**
+```env
+REACT_APP_API_URL=https://your-backend-app.ondigitalocean.app
+REACT_APP_ENVIRONMENT=production
+GENERATE_SOURCEMAP=false
+```
+
+##### Step 5: Database Configuration
+**Option A: SQLite (Recommended for Small to Medium Apps)**
+- Uses local file storage within the backend container
+- No additional database service needed
+- Data persists across deploys in the `/data` directory
+
+**Option B: DigitalOcean Managed PostgreSQL Database**
+1. Create a PostgreSQL database in DigitalOcean
+2. Add these environment variables to backend:
+```env
+DB_TYPE=postgresql
+DB_HOST=your-db-host.db.ondigitalocean.com
+DB_PORT=25060
+DB_NAME=defaultdb
+DB_USERNAME=your-db-user
+DB_PASSWORD=your-db-password
+DB_SSL=true
+```
+
+##### Step 6: Deploy and Configure
+1. **Click "Create Resources"** - App Platform will build and deploy both components
+2. **Wait for deployment** (usually 5-10 minutes)
+3. **Get your app URLs**:
+   - Backend API: `https://your-backend-app.ondigitalocean.app`
+   - Frontend: `https://your-frontend-app.ondigitalocean.app`
+
+##### Step 7: Update Cross-Origin Configuration
+After deployment, update the environment variables with actual URLs:
+
+**Backend Environment Variables:**
+```env
+FRONTEND_URL=https://your-actual-frontend.ondigitalocean.app
+ALLOWED_ORIGINS=https://your-actual-frontend.ondigitalocean.app
+```
+
+**Frontend Environment Variables:**
+```env
+REACT_APP_API_URL=https://your-actual-backend.ondigitalocean.app
+```
+
+##### Step 8: Custom Domain (Optional)
+1. Add your custom domain in App Platform settings
+2. Update CORS settings with your custom domain
+3. Configure DNS records as provided by DigitalOcean
+
+##### Monitoring and Logs
+- **Application Logs**: Available in the App Platform dashboard
+- **Runtime Metrics**: CPU, Memory usage monitoring
+- **Health Checks**: Automatic health monitoring
+- **Scaling**: Auto-scaling based on traffic (paid plans)
+
+##### Cost Optimization
+- **Basic Plan**: $5-12/month per component
+- **Pro Plan**: $12-24/month per component (includes auto-scaling)
+- **Database**: $15/month for managed PostgreSQL (or use SQLite for free)
+
+##### Troubleshooting Common Issues
+
+**Build Failures:**
+```bash
+# Check build logs in App Platform dashboard
+# Ensure all dependencies are in package.json
+# Verify Node.js version compatibility
+```
+
+**CORS Errors:**
+```bash
+# Update ALLOWED_ORIGINS in backend .env
+# Ensure frontend URL matches exactly
+# No trailing slashes in URLs
+```
+
+**Database Connection Issues:**
+```bash
+# For SQLite: Ensure data directory exists
+# For PostgreSQL: Verify connection string
+# Check firewall settings for managed database
+```
+
+**Environment Variable Issues:**
+```bash
+# Ensure all required variables are set in App Platform
+# Restart app after changing environment variables
+# Check logs for missing variable errors
+```
+
+##### Production Checklist
+- [ ] All environment variables set with production values
+- [ ] Strong JWT_SECRET and ENCRYPTION_KEY generated
+- [ ] CORS properly configured for frontend domain
+- [ ] Database migrations run successfully
+- [ ] File upload limits appropriate for production
+- [ ] Monitoring and alerting configured
+- [ ] Custom domain configured (if applicable)
+- [ ] SSL certificates active
+- [ ] Backup strategy in place (for important data)
+
+#### 📦 **Vercel** (Frontend + Serverless API)
 1. Connect your GitHub repo to Vercel
 2. Set build command: `cd frontend && npm run build`
 3. Set output directory: `frontend/build`
