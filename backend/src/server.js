@@ -23,6 +23,24 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Ensure uploads directory exists
 fs.ensureDirSync('uploads');
 
+// Initialize database on startup
+const initializeDatabase = async () => {
+  try {
+    console.log('📊 Initializing database...');
+    // Run migrations if they exist
+    if (fs.existsSync(path.join(__dirname, 'migrations/run.js'))) {
+      const migrate = require('./migrations/run.js');
+      if (typeof migrate === 'function') {
+        await migrate();
+      }
+    }
+    console.log('✅ Database initialized successfully');
+  } catch (error) {
+    console.warn('⚠️ Database initialization warning:', error.message);
+    // Don't fail startup if migrations have issues
+  }
+};
+
 // Routes
 app.use('/api', require('./routes/import'));
 app.use('/api/reports', require('./routes/reports'));
@@ -134,6 +152,7 @@ app.listen(PORT, '0.0.0.0', async () => {
   // Initialize SQLite database
   try {
     console.log('📊 Using SQLite database for development');
+    await initializeDatabase();
     console.log('� Sensitive data will be encrypted automatically');
     
   } catch (error) {

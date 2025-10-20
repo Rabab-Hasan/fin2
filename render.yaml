@@ -1,0 +1,26 @@
+# Render.com deployment configuration for Finance Dashboard
+version: 2
+
+services:
+  # Full-stack Node.js service (serves both API and static files)
+  - type: web
+    name: finance-dashboard
+    runtime: node
+    region: ohio
+    plan: starter
+    buildCommand: npm install && cd backend && npm rebuild sqlite3 && cd ../frontend && npm install && npm run build && cd ..
+    startCommand: cd backend && npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 8080
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ENCRYPTION_KEY  
+        generateValue: true
+      - key: API_SECRET_KEY
+        generateValue: true
+      - key: MONGODB_URI
+        value: mongodb+srv://rhasan:GlassDoor2025@cluster0.tj04exd.mongodb.net/genius_db?retryWrites=true&w=majority&appName=Cluster0

@@ -1,9 +1,8 @@
 // Secure API client with encryption support
 import clientEncryption from './encryption.js';
 
-const API_BASE = process.env.NODE_ENV === 'production' 
-  ? `${window.location.protocol}//${window.location.hostname}:2345`
-  : `${window.location.protocol}//${window.location.hostname}:2345`;
+const API_BASE = process.env.REACT_APP_API_URL || 
+  `${window.location.protocol}//${window.location.hostname}:2345`;
 
 class SecureApiClient {
   constructor() {
