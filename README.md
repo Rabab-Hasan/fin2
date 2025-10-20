@@ -1,8 +1,8 @@
 # Finance Dashboard
 
-A comprehensive business data management and analytics platform with React frontend and Node.js backend.
+A comprehensive marketing data analysis and campaign management platform with AI-powered insights.
 
-> **🚀 Latest Update**: GFH Vector Database System - Search through ALL campaign data with natural language queries!
+> **🚀 Latest Update**: Marketing Analysis Dashboard - Upload CSV files for comprehensive campaign performance analysis with hour-by-hour comparisons and AI insights!
 
 ## Features
 
@@ -207,11 +207,92 @@ PORT=3001
 REACT_APP_API_URL=http://localhost:3001
 ```
 
-## Production Deployment
+## 🚀 Deployment Options
 
-1. **Database**: Set up PostgreSQL with required environment variables
-2. **Backend**: `npm run migrate && npm start`
-3. **Frontend**: `npm run build` and serve static files
-4. **Backups**: Ensure backup directories have write permissions
+### Quick Start (All Platforms)
+```bash
+# Install all dependencies
+npm run install-all
 
-The application implements exactly the requirements specified, with smart JSONB merge upserts ensuring no data loss during imports and a flexible schema that grows automatically with new columns.
+# Development (runs both frontend and backend)
+npm run dev
+
+# Production build
+npm run build
+npm start
+```
+
+### Platform-Specific Deployment
+
+#### 📦 **Vercel** (Recommended for Frontend + Serverless API)
+1. Connect your GitHub repo to Vercel
+2. Set build command: `cd frontend && npm run build`
+3. Set output directory: `frontend/build`
+4. Add environment variables in Vercel dashboard
+
+#### 🌐 **Netlify**
+1. Connect GitHub repo
+2. Build settings automatically detected from `netlify.toml`
+3. Add environment variables in site settings
+
+#### 🐳 **Docker** (Any Cloud Provider)
+```bash
+# Build and run with Docker
+docker build -t finance-dashboard .
+docker run -p 2345:2345 finance-dashboard
+
+# Or use Docker Compose
+docker-compose up -d
+```
+
+#### ☁️ **Heroku**
+```bash
+# Add buildpacks
+heroku buildpacks:set heroku/nodejs
+heroku buildpacks:add --index 1 heroku-community/multi-procfile
+
+# Deploy
+git push heroku main
+```
+
+#### 🖥️ **VPS/Server**
+```bash
+# Clone and setup
+git clone <your-repo>
+cd finance-dashboard
+npm run install-all
+
+# Build and start
+npm run build
+pm2 start backend/src/server.js --name finance-dashboard
+```
+
+### Environment Variables
+Create `.env` files in both `frontend/` and `backend/` directories:
+
+**Backend (.env):**
+```env
+PORT=2345
+NODE_ENV=production
+ENCRYPTION_KEY=your-secret-key
+```
+
+**Frontend (.env):**
+```env
+REACT_APP_API_URL=https://your-backend-url.com
+```
+
+### 🔧 Build Configuration
+The project includes configurations for:
+- ✅ **package.json** - Root project configuration
+- ✅ **vercel.json** - Vercel deployment settings
+- ✅ **netlify.toml** - Netlify build configuration  
+- ✅ **Dockerfile** - Container deployment
+- ✅ **docker-compose.yml** - Local development with Docker
+
+### 📊 Features
+- **Marketing Data Analysis** - Upload CSV files for comprehensive analysis
+- **Hour-by-Hour Comparison** - Compare performance across different days for each hour
+- **AI Campaign Assistant** - Ollama-powered insights from actual GFH data
+- **Real-time Analytics** - Interactive dashboards and visualizations
+- **Data Security** - Encrypted sensitive data storage

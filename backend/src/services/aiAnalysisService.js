@@ -112,6 +112,75 @@ Focus on practical, data-driven insights that can lead to real business improvem
     return JSON.stringify(summary, null, 2);
   }
 
+  // New method for Campaign Assistant with Ollama
+  async analyzeCampaignWithOllama(prompt) {
+    try {
+      const response = await this.ollama.chat({
+        model: this.model,
+        messages: [{ role: 'user', content: prompt }],
+        stream: false
+      });
+
+      // Parse AI response
+      try {
+        const analysis = JSON.parse(response.message.content);
+        return analysis;
+      } catch (parseError) {
+        console.error('Failed to parse campaign analysis:', parseError);
+        // Return structured fallback
+        return {
+          insights: [{
+            type: 'system',
+            priority: 'medium',
+            title: 'AI Response Parse Error',
+            message: 'Ollama returned a response but it could not be parsed. Raw response available.',
+            recommendation: 'Check Ollama model output format.',
+            gfhEvidence: response.message.content.substring(0, 200) + '...'
+          }],
+          forecasts: {
+            expectedCTR: 0.015,
+            expectedCPC: 0.20,
+            expectedCPM: 3.50,
+            expectedReach: 50000,
+            expectedImpressions: 250000,
+            confidenceLevel: 'low'
+          },
+          recommendations: ['Review raw AI response for insights']
+        };
+      }
+    } catch (error) {
+      console.error('Ollama campaign analysis error:', error);
+      throw error;
+    }
+  }
+
+  // New method for GFH questions with Ollama
+  async askGFHQuestion(prompt) {
+    try {
+      const response = await this.ollama.chat({
+        model: this.model,
+        messages: [{ role: 'user', content: prompt }],
+        stream: false
+      });
+
+      try {
+        const analysis = JSON.parse(response.message.content);
+        return analysis;
+      } catch (parseError) {
+        console.error('Failed to parse GFH response:', parseError);
+        return {
+          answer: response.message.content,
+          evidence: [],
+          insights: ['AI response parsing failed - raw response provided'],
+          recommendations: ['Check Ollama response format']
+        };
+      }
+    } catch (error) {
+      console.error('Ollama GFH question error:', error);
+      throw error;
+    }
+  }
+
   fallbackAnalysis(data, metric) {
     // This is the existing rule-based analysis as fallback
     const insights = [];

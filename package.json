@@ -1,0 +1,41 @@
+{
+  "name": "finance-dashboard",
+  "version": "1.0.0",
+  "description": "Marketing Data Analysis Dashboard with Campaign Assistant powered by AI",
+  "main": "backend/src/server.js",
+  "scripts": {
+    "install-all": "npm install && cd frontend && npm install && cd ../backend && npm install",
+    "build": "cd frontend && npm run build",
+    "start": "cd backend && npm start",
+    "dev": "concurrently \"cd backend && npm start\" \"cd frontend && npm start\"",
+    "frontend": "cd frontend && npm start",
+    "backend": "cd backend && npm start",
+    "deploy-build": "cd frontend && npm run build && cd ../backend && npm install --production"
+  },
+  "keywords": [
+    "marketing",
+    "analytics",
+    "dashboard",
+    "ai",
+    "campaign-analysis"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=7.0.0"
+  },
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Rabab-Hasan/fin2.git"
+  },
+  "homepage": ".",
+  "private": true
+}

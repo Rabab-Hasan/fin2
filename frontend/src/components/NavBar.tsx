@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Database, FlaskConical, ClipboardList, Building, LogOut, User, Target } from 'lucide-react';
+import { Home, Database, FlaskConical, ClipboardList, Building, LogOut, User, Target, BarChart3 } from 'lucide-react';
 import { useClient } from '../contexts/ClientContext';
 import { useAuth } from '../contexts/AuthContext';
 import NotificationBell from './NotificationBell';
@@ -14,6 +14,7 @@ const NavBar: React.FC = () => {
     { path: '/', label: 'Home', icon: Home },
     { path: '/business', label: 'Business Data', icon: Database },
     { path: '/campaign-setup', label: 'Campaign Setup', icon: Target },
+    { path: '/marketing-analysis', label: 'Marketing Analysis', icon: BarChart3 },
     { path: '/project-overview', label: 'Project Overview', icon: ClipboardList },
   ];
 
@@ -22,8 +23,6 @@ const NavBar: React.FC = () => {
   ];
 
   const labsNavItem = { path: '/labs', label: 'Action Labs', icon: FlaskConical };
-  const gfhTestItem = { path: '/gfh-test', label: 'GFH Data Test', icon: Database };
-  const vectorTestItem = { path: '/vector-test', label: 'Vector DB Test', icon: Database };
 
   // Build navigation items based on user type
   let navItems = [];
@@ -43,8 +42,6 @@ const NavBar: React.FC = () => {
           user?.user_type === 'employee' || 
           !user?.user_type ? adminNavItems : []),
       labsNavItem,
-      gfhTestItem,
-      vectorTestItem,
     ];
   }
 

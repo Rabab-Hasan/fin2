@@ -8,6 +8,7 @@ import Labs from './pages/Labs';
 import ProjectOverviewPage from './pages/ProjectOverviewPage';
 import AccessPage from './pages/AccessPage';
 import CampaignSetup from './pages/CampaignSetup';
+import MarketingAnalysisPage from './pages/MarketingAnalysisPage';
 import TikTokAuthCallback from './pages/TikTokAuthCallback';
 import MetaAuthCallback from './pages/MetaAuthCallback';
 import GFHTestValidation from './components/GFHTestValidation';
@@ -55,6 +56,11 @@ function App() {
                     <Route path="/campaign-setup" element={
                       <RouteProtector allowedRoutes={['/business', '/project-overview']}>
                         <CampaignSetup />
+                      </RouteProtector>
+                    } />
+                    <Route path="/marketing-analysis" element={
+                      <RouteProtector allowedRoutes={['/business']}>
+                        <MarketingAnalysisPage />
                       </RouteProtector>
                     } />
 
