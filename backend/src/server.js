@@ -57,6 +57,15 @@ app.use('/api/roadmap', require('./routes/roadmap'));
 // Initialize campaigns routes
 app.use('/api/campaigns', require('./routes/campaigns'));
 
+// Initialize campaign assistant routes (Ollama AI-powered)
+app.use('/api/campaign-assistant', require('./routes/campaign-assistant'));
+
+// Initialize enhanced campaign assistant routes (Full GFH file analysis + Ollama)
+app.use('/api/enhanced-campaign-assistant', require('./routes/enhancedCampaignAssistant'));
+
+// Initialize marketing analysis routes (CSV upload and comprehensive analysis)
+app.use('/api/marketing-analysis', require('./routes/marketingAnalysis'));
+
 // Initialize campaign performance routes
 app.use('/api/campaign-performance', require('./routes/campaign-performance'));
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Brain, TrendingUp, Target, Clock, DollarSign, Map, Lightbulb, BarChart3, AlertCircle, CheckCircle, Zap, Eye } from 'lucide-react';
+import { Brain, TrendingUp, Target, Clock, DollarSign, Map, Lightbulb, BarChart3, AlertCircle, CheckCircle, Zap, Eye, Loader } from 'lucide-react';
 import CampaignAssistant, { 
   type CampaignAssistantRecommendations,
   type TimingRecommendation,
@@ -9,6 +9,7 @@ import CampaignAssistant, {
 } from '../utils/campaignAssistant';
 import GFHDataAnalyzer, { type DynamicInsight } from '../utils/gfhDataAnalyzer';
 import { askGFH, enhancedGFH, type EnhancedGFHResponse } from '../utils/enhancedGFHQueryInterface';
+import { campaignAssistantAPI, type OllamaInsight, type OllamaAnalysisResponse, type GFHQuestionResponse } from '../utils/campaignAssistantAPI';
 
 interface CampaignAssistantProps {
   budget: number;
@@ -32,22 +33,30 @@ const CampaignAssistantComponent: React.FC<CampaignAssistantProps> = ({
   const [recommendations, setRecommendations] = useState<CampaignAssistantRecommendations | null>(null);
   const [dynamicInsights, setDynamicInsights] = useState<DynamicInsight[]>([]);
   const [enhancedInsights, setEnhancedInsights] = useState<EnhancedGFHResponse[]>([]);
-  const [activeTab, setActiveTab] = useState<'insights' | 'timing' | 'content' | 'markets' | 'platforms' | 'strategy' | 'vector-search'>('insights');
+  
+  // Ollama AI states
+  const [ollamaInsights, setOllamaInsights] = useState<OllamaInsight[]>([]);
+  const [ollamaForecasts, setOllamaForecasts] = useState<any>(null);
+  const [ollamaRecommendations, setOllamaRecommendations] = useState<string[]>([]);
+  const [ollamaDataSource, setOllamaDataSource] = useState<any>(null);
+  const [ollamaStatus, setOllamaStatus] = useState<'loading' | 'success' | 'error' | 'inactive'>('inactive');
+  
+  const [activeTab, setActiveTab] = useState<'ollama' | 'insights' | 'timing' | 'content' | 'markets' | 'platforms' | 'strategy' | 'vector-search'>('ollama');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [searchResults, setSearchResults] = useState<EnhancedGFHResponse | null>(null);
+  const [searchResults, setSearchResults] = useState<GFHQuestionResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
 
-  // Handle vector search queries
-  const handleVectorSearch = async () => {
+  // Handle Ollama GFH questions
+  const handleOllamaSearch = async () => {
     if (!searchQuery.trim()) return;
     
     setIsSearching(true);
     try {
-      const result = await enhancedGFH.askAnyQuestion(searchQuery);
+      const result = await campaignAssistantAPI.askGFHQuestion(searchQuery);
       setSearchResults(result);
     } catch (error) {
-      console.error('Search error:', error);
+      console.error('Ollama search error:', error);
     } finally {
       setIsSearching(false);
     }
@@ -57,66 +66,107 @@ const CampaignAssistantComponent: React.FC<CampaignAssistantProps> = ({
   useEffect(() => {
     if (budget > 0 && duration > 0 && countries.length > 0) {
       setIsLoading(true);
+      setOllamaStatus('loading');
       
-      // Simulate API delay for better UX
-      const timer = setTimeout(() => {
-        // Generate static recommendations
-        const newRecommendations = CampaignAssistant.getCampaignRecommendations(
-          budget, 
-          duration, 
-          countries, 
-          platforms, 
-          objectives
-        );
-        setRecommendations(newRecommendations);
-
-        // Generate dynamic insights from GFH data
-        const newDynamicInsights = GFHDataAnalyzer.analyzeUserCampaign(
-          budget,
-          duration,
-          countries,
-          platforms,
-          objectives,
-          contentSelected
-        );
-        
-        // Generate enhanced insights using vector database
-        const generateEnhancedInsights = async () => {
-          try {
-            const enhancedResults: EnhancedGFHResponse[] = [];
-            
-            // Analyze overall campaign plan
-            const campaignAnalysis = await enhancedGFH.analyzeCampaignPlan({
-              budget,
-              duration,
-              markets: countries,
-              platforms,
-              objectives,
-              contentTypes: contentSelected ? Object.keys(contentSelected).filter(k => (contentSelected as any)[k]) : []
-            });
-            enhancedResults.push(campaignAnalysis);
-            
-            // Get specific market + platform combinations
-            for (const country of countries.slice(0, 2)) { // Limit to avoid too many calls
-              for (const platform of platforms.slice(0, 2)) {
-                const forecast = await enhancedGFH.forecastCampaignPerformance(platform, country, budget / countries.length, duration);
-                enhancedResults.push(forecast);
-              }
-            }
-            
-            setEnhancedInsights(enhancedResults);
-          } catch (error) {
-            console.error('Error generating enhanced insights:', error);
+      // Get Ollama AI analysis (primary feature)
+      const getOllamaAnalysis = async () => {
+        try {
+          console.log('🤖 Getting Ollama campaign analysis...');
+          const ollamaResponse = await campaignAssistantAPI.analyzeCampaign({
+            budget,
+            duration,
+            countries,
+            platforms,
+            objectives: objectives || [],
+            contentTypes: contentSelected || []
+          });
+          
+          if (ollamaResponse.success) {
+            console.log('✅ Ollama analysis successful');
+            setOllamaInsights(ollamaResponse.analysis.insights);
+            setOllamaForecasts(ollamaResponse.analysis.forecasts);
+            setOllamaRecommendations(ollamaResponse.analysis.recommendations);
+            setOllamaDataSource(ollamaResponse.dataSource);
+            setOllamaStatus('success');
+          } else {
+            console.log('⚠️ Ollama analysis failed, showing fallback');
+            setOllamaInsights(ollamaResponse.analysis.insights);
+            setOllamaForecasts(ollamaResponse.analysis.forecasts);
+            setOllamaRecommendations(ollamaResponse.analysis.recommendations);
+            setOllamaDataSource(ollamaResponse.dataSource);
+            setOllamaStatus('error');
           }
-        };
-        
-        generateEnhancedInsights();
-        setDynamicInsights(newDynamicInsights);
-        
-        setIsLoading(false);
-      }, 800);
+        } catch (error) {
+          console.error('❌ Ollama analysis error:', error);
+          setOllamaStatus('error');
+          setOllamaInsights([{
+            type: 'system',
+            priority: 'high',
+            title: 'Connection Error',
+            message: 'Could not connect to Campaign Assistant AI. Please check backend server and Ollama service.',
+            recommendation: 'Ensure backend is running and Ollama is installed with mistral model.',
+            gfhEvidence: 'Connection failed'
+          }]);
+        }
+      };
+      
+      // Get legacy recommendations as backup
+      const getLegacyRecommendations = async () => {
+        try {
+          // Generate static recommendations
+          const newRecommendations = CampaignAssistant.getCampaignRecommendations(
+            budget, 
+            duration, 
+            countries, 
+            platforms, 
+            objectives
+          );
+          setRecommendations(newRecommendations);
 
-      return () => clearTimeout(timer);
+          // Generate dynamic insights from GFH data
+          const newDynamicInsights = GFHDataAnalyzer.analyzeUserCampaign(
+            budget,
+            duration,
+            countries,
+            platforms,
+            objectives,
+            contentSelected
+          );
+          setDynamicInsights(newDynamicInsights);
+          
+          // Generate enhanced insights using vector database
+          const enhancedResults: EnhancedGFHResponse[] = [];
+          
+          const campaignAnalysis = await enhancedGFH.analyzeCampaignPlan({
+            budget,
+            duration,
+            markets: countries,
+            platforms,
+            objectives,
+            contentTypes: contentSelected ? Object.keys(contentSelected).filter(k => (contentSelected as any)[k]) : []
+          });
+          enhancedResults.push(campaignAnalysis);
+          
+          for (const country of countries.slice(0, 2)) {
+            for (const platform of platforms.slice(0, 2)) {
+              const forecast = await enhancedGFH.forecastCampaignPerformance(platform, country, budget / countries.length, duration);
+              enhancedResults.push(forecast);
+            }
+          }
+          
+          setEnhancedInsights(enhancedResults);
+        } catch (error) {
+          console.error('Error generating legacy insights:', error);
+        }
+      };
+
+      // Run both analyses
+      Promise.all([
+        getOllamaAnalysis(),
+        getLegacyRecommendations()
+      ]).finally(() => {
+        setIsLoading(false);
+      });
     }
   }, [budget, duration, countries, platforms, objectives, contentSelected]);
 
@@ -415,10 +465,10 @@ const CampaignAssistantComponent: React.FC<CampaignAssistantProps> = ({
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="e.g., Which platform performs best in Saudi Arabia? What's the average CPC for Meta campaigns?"
             className="flex-1 px-3 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            onKeyPress={(e) => e.key === 'Enter' && handleVectorSearch()}
+            onKeyPress={(e) => e.key === 'Enter' && handleOllamaSearch()}
           />
           <button
-            onClick={handleVectorSearch}
+            onClick={handleOllamaSearch}
             disabled={isSearching || !searchQuery.trim()}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
           >
@@ -449,42 +499,44 @@ const CampaignAssistantComponent: React.FC<CampaignAssistantProps> = ({
               Analysis Results
             </h3>
             <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
-              {searchResults.confidence.toFixed(0)}% Confidence
+              {searchResults.success ? '✅ AI Analysis' : '⚠️ Fallback Response'}
             </span>
           </div>
           
           <div className="prose max-w-none">
             <div className="whitespace-pre-wrap text-sm text-gray-700">
-              {searchResults.answer}
+              {searchResults.response.answer}
             </div>
           </div>
 
-          {searchResults.insights.length > 0 && (
+          {searchResults.response.insights.length > 0 && (
             <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
               <h4 className="font-medium text-yellow-800 mb-2">Key Insights:</h4>
               <ul className="text-sm text-yellow-700 space-y-1">
-                {searchResults.insights.map((insight, i) => (
+                {searchResults.response.insights.map((insight, i) => (
                   <li key={i}>• {insight}</li>
                 ))}
               </ul>
             </div>
           )}
 
-          {searchResults.recommendations.length > 0 && (
+          {searchResults.response.recommendations.length > 0 && (
             <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded">
               <h4 className="font-medium text-green-800 mb-2">Recommendations:</h4>
               <ul className="text-sm text-green-700 space-y-1">
-                {searchResults.recommendations.map((rec, i) => (
+                {searchResults.response.recommendations.map((rec, i) => (
                   <li key={i}>• {rec}</li>
                 ))}
               </ul>
             </div>
           )}
 
-          <div className="mt-3 text-xs text-gray-500 flex items-center">
-            <BarChart3 className="w-3 h-3 mr-1" />
-            Based on {searchResults.campaignsAnalyzed} campaigns from GFH performance data
-          </div>
+          {searchResults.dataSource && (
+            <div className="mt-3 text-xs text-gray-500 flex items-center">
+              <BarChart3 className="w-3 h-3 mr-1" />
+              Data source: {searchResults.dataSource}
+            </div>
+          )}
         </div>
       )}
 
@@ -653,8 +705,14 @@ const CampaignAssistantComponent: React.FC<CampaignAssistantProps> = ({
       <div className="px-6 py-4 bg-gray-50 border-b">
         <div className="flex flex-wrap gap-2">
           <TabButton 
-            tab="insights" 
+            tab="ollama" 
             icon={<Brain className="w-4 h-4" />} 
+            label="🤖 Ollama AI" 
+            count={ollamaInsights.length}
+          />
+          <TabButton 
+            tab="insights" 
+            icon={<TrendingUp className="w-4 h-4" />} 
             label="GFH Insights" 
             count={dynamicInsights.length}
           />
@@ -690,7 +748,7 @@ const CampaignAssistantComponent: React.FC<CampaignAssistantProps> = ({
           />
           <TabButton 
             tab="vector-search" 
-            icon={<Brain className="w-4 h-4" />} 
+            icon={<Eye className="w-4 h-4" />} 
             label="Ask GFH Data" 
             count={enhancedInsights.length}
           />
@@ -699,6 +757,141 @@ const CampaignAssistantComponent: React.FC<CampaignAssistantProps> = ({
 
       {/* Tab Content */}
       <div className="px-6 py-6 max-h-96 overflow-y-auto">
+        {activeTab === 'ollama' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                  <Brain className="w-5 h-5 text-purple-600" />
+                  Ollama AI Campaign Analysis
+                </h3>
+                <p className="text-sm text-gray-600">AI-powered insights from GFH campaign performance data</p>
+              </div>
+              <div className="flex items-center gap-2">
+                {ollamaStatus === 'loading' && (
+                  <Loader className="w-4 h-4 animate-spin text-blue-500" />
+                )}
+                <span className={`text-xs px-2 py-1 rounded-full ${
+                  ollamaStatus === 'success' ? 'bg-green-100 text-green-700' :
+                  ollamaStatus === 'error' ? 'bg-yellow-100 text-yellow-700' :
+                  ollamaStatus === 'loading' ? 'bg-blue-100 text-blue-700' :
+                  'bg-gray-100 text-gray-700'
+                }`}>
+                  {ollamaStatus === 'success' ? '✅ AI Connected' :
+                   ollamaStatus === 'error' ? '⚠️ Fallback Mode' :
+                   ollamaStatus === 'loading' ? '🔄 Analyzing...' :
+                   'Ready'}
+                </span>
+              </div>
+            </div>
+
+            {/* Ollama Insights */}
+            {ollamaInsights.length > 0 && (
+              <div className="space-y-4">
+                <h4 className="font-medium text-gray-900 flex items-center gap-2">
+                  <Eye className="w-4 h-4 text-blue-500" />
+                  AI Campaign Insights ({ollamaInsights.length})
+                </h4>
+                <div className="grid gap-4">
+                  {ollamaInsights.map((insight, index) => (
+                    <div key={index} className={`p-4 rounded-lg border ${
+                      insight.priority === 'high' ? 'border-red-200 bg-red-50' :
+                      insight.priority === 'medium' ? 'border-yellow-200 bg-yellow-50' :
+                      'border-green-200 bg-green-50'
+                    }`}>
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className={`text-xs px-2 py-1 rounded ${
+                              insight.priority === 'high' ? 'bg-red-100 text-red-700' :
+                              insight.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                              'bg-green-100 text-green-700'
+                            }`}>
+                              {insight.type}
+                            </span>
+                            <span className={`w-2 h-2 rounded-full ${
+                              insight.priority === 'high' ? 'bg-red-500' :
+                              insight.priority === 'medium' ? 'bg-yellow-500' :
+                              'bg-green-500'
+                            }`}></span>
+                          </div>
+                          <h5 className="font-medium text-gray-900 mb-1">{insight.title}</h5>
+                          <p className="text-sm text-gray-700 mb-2">{insight.message}</p>
+                          {insight.recommendation && (
+                            <p className="text-sm font-medium text-gray-800 bg-white p-2 rounded border">
+                              💡 {insight.recommendation}
+                            </p>
+                          )}
+                          {insight.gfhEvidence && (
+                            <div className="mt-2 text-xs text-gray-500">
+                              📈 Evidence: {insight.gfhEvidence}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Ollama Forecasts */}
+            {ollamaForecasts && (
+              <div className="space-y-4">
+                <h4 className="font-medium text-gray-900 flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-green-500" />
+                  AI Performance Forecasts
+                </h4>
+                <div className="grid md:grid-cols-2 gap-4">
+                  {Object.entries(ollamaForecasts).map(([key, value]) => (
+                    <div key={key} className="p-3 bg-gray-50 rounded border">
+                      <div className="text-sm font-medium text-gray-900 capitalize">
+                        {key.replace(/([A-Z])/g, ' $1').trim()}
+                      </div>
+                      <div className="text-lg font-semibold text-gray-800">
+                        {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Ollama Recommendations */}
+            {ollamaRecommendations.length > 0 && (
+              <div className="space-y-4">
+                <h4 className="font-medium text-gray-900 flex items-center gap-2">
+                  <Lightbulb className="w-4 h-4 text-yellow-500" />
+                  AI Strategic Recommendations ({ollamaRecommendations.length})
+                </h4>
+                <div className="space-y-2">
+                  {ollamaRecommendations.map((rec, index) => (
+                    <div key={index} className="flex items-start gap-3 p-3 bg-blue-50 rounded border border-blue-200">
+                      <CheckCircle className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                      <span className="text-sm text-gray-700">{rec}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Data Source Info */}
+            {ollamaDataSource && (
+              <div className="p-3 bg-gray-100 rounded border">
+                <div className="text-xs text-gray-600">
+                  📊 Analysis based on: {ollamaDataSource}
+                </div>
+              </div>
+            )}
+
+            {ollamaInsights.length === 0 && ollamaStatus === 'inactive' && (
+              <div className="text-center py-8 text-gray-500">
+                <Brain className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                <p>Enter campaign parameters to get AI-powered insights</p>
+              </div>
+            )}
+          </div>
+        )}
         {activeTab === 'insights' && <DynamicInsights insights={dynamicInsights} />}
         {activeTab === 'timing' && recommendations && <TimingRecommendations recommendations={recommendations.timingRecommendations} />}
         {activeTab === 'content' && recommendations && <ContentRecommendations recommendations={recommendations.contentRecommendations} />}
