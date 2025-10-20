@@ -17,7 +17,12 @@ cd ..
 echo "🎨 Building frontend..."
 cd frontend
 npm install
+
+# Fix permissions for react-scripts
+echo "🔧 Setting permissions for react-scripts..."
 chmod +x node_modules/.bin/react-scripts
+chmod +x node_modules/.bin/*
+
 npm run build
 cd ..
 
