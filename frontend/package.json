@@ -27,7 +27,7 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "CI=false react-scripts build",
+    "build": "cross-env CI=false react-scripts build",
     "build:ci": "react-scripts build",
     "serve": "serve -s build -l 3000",
     "build:production": "npm run build && npm run serve",

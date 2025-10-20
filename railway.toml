@@ -1,0 +1,13 @@
+# Railway deployment configuration
+# Deploy: railway up
+
+[build]
+  command = "cd backend && npm install && npm rebuild sqlite3"
+
+[deploy]
+  startCommand = "cd backend && npm start"
+  healthcheckPath = "/api/health"
+
+[env]
+  NODE_ENV = "production"
+  PORT = "3000"

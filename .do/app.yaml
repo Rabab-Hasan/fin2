@@ -6,13 +6,16 @@ services:
 - name: backend
   source_dir: /backend
   github:
-    repo: your-username/finance-dashboard
+    repo: Rabab-Hasan/fin2
     branch: main
   run_command: npm start
-  build_command: npm install --production --no-audit
+  build_command: npm install && npm rebuild sqlite3
   environment_slug: node-js
   instance_count: 1
   instance_size_slug: basic-xxs
+  http_port: 8080
+  health_check:
+    http_path: /api/health
   routes:
   - path: /api
   envs:
@@ -26,10 +29,11 @@ services:
   - key: ENCRYPTION_KEY
     value: your-encryption-key-here
     type: SECRET
-  - key: DB_TYPE
-    value: sqlite
-  - key: SQLITE_PATH
-    value: ./data/finance_dashboard.db
+  - key: API_SECRET_KEY
+    value: your-api-secret-here
+    type: SECRET
+  - key: MONGODB_URI
+    value: mongodb+srv://rhasan:GlassDoor2025@cluster0.tj04exd.mongodb.net/genius_db?retryWrites=true&w=majority&appName=Cluster0
 
 - name: frontend
   source_dir: /frontend
