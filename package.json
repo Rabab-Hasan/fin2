@@ -9,7 +9,7 @@
     "start": "cd backend && npm start",
     "dev": "concurrently \"cd backend && npm run dev\" \"cd frontend && npm start\"",
     "frontend": "cd frontend && npm start",
-    "backend": "cd backend && npm start",
+    "backend": "cd backend && npm run dev",
     "deploy-build": "cd backend && npm rebuild sqlite3 && cd ../frontend && chmod +x node_modules/.bin/react-scripts && npm run build",
     "prepare-deploy": "npm run deploy-check && npm run deploy-build",
     "digitalocean": "npm run prepare-deploy && echo 'Ready for DigitalOcean App Platform deployment!'"
