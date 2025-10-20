@@ -8,7 +8,7 @@
   NODE_VERSION = "20"
   NPM_FLAGS = "--legacy-peer-deps"
   CI = "false"
-  REACT_APP_API_URL = "/.netlify/functions/api"
+  REACT_APP_API_URL = "/.netlify/functions"
   # Backend environment variables for Netlify Functions
   NODE_ENV = "production"
   JWT_SECRET = "your-jwt-secret-key-change-this-in-production"

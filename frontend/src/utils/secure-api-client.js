@@ -4,7 +4,7 @@ import clientEncryption from './encryption.js';
 // Use Netlify Functions for production, localhost for development
 const API_BASE = process.env.REACT_APP_API_URL || 
   (process.env.NODE_ENV === 'production' 
-    ? '/.netlify/functions/api' 
+    ? '/.netlify/functions' 
     : 'http://localhost:2345');
 
 class SecureApiClient {
