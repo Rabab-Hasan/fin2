@@ -6,6 +6,7 @@
 [build.environment]
   NODE_VERSION = "20.18.0"
   NPM_FLAGS = "--legacy-peer-deps"
+  CI = "false"
 
 [[redirects]]
   from = "/api/*"
