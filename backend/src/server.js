@@ -29,10 +29,8 @@ const initializeDatabase = async () => {
     console.log('📊 Initializing database...');
     // Run migrations if they exist
     if (fs.existsSync(path.join(__dirname, 'migrations/run.js'))) {
-      const migrate = require('./migrations/run.js');
-      if (typeof migrate === 'function') {
-        await migrate();
-      }
+      const runMigrations = require('./migrations/run.js');
+      await runMigrations();
     }
     console.log('✅ Database initialized successfully');
   } catch (error) {

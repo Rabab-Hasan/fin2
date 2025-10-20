@@ -18,11 +18,25 @@ async function runMigrations() {
     }
     
     console.log('Migrations completed successfully');
-    process.exit(0);
+    // Only exit if this file is run directly, not when required
+    if (require.main === module) {
+      process.exit(0);
+    }
   } catch (error) {
     console.error('Migration failed:', error);
-    process.exit(1);
+    // Only exit if this file is run directly, not when required
+    if (require.main === module) {
+      process.exit(1);
+    } else {
+      throw error; // Re-throw the error for the caller to handle
+    }
   }
 }
 
-runMigrations();
+// Export the function for use by server.js
+module.exports = runMigrations;
+
+// Only run migrations if this file is executed directly
+if (require.main === module) {
+  runMigrations();
+}
