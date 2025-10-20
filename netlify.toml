@@ -1,13 +1,30 @@
 [build]
   base = "frontend/"
   publish = "build/"
-  command = "npm ci && npm run build"
+  command = "npm ci && npm run build && cd ../netlify/functions && npm install"
+  functions = "netlify/functions"
 
 [build.environment]
   NODE_VERSION = "20"
   NPM_FLAGS = "--legacy-peer-deps"
   CI = "false"
-  REACT_APP_API_URL = "https://finance-dashboard-backend.onrender.com"
+  REACT_APP_API_URL = "/.netlify/functions/api"
+  # Backend environment variables for Netlify Functions
+  NODE_ENV = "production"
+  JWT_SECRET = "your-jwt-secret-key-change-this-in-production"
+  ENCRYPTION_KEY = "your-32-character-encryption-key-here"
+  API_SECRET_KEY = "your-api-secret-key-change-this"
+  MONGODB_URI = "mongodb+srv://rhasan:GlassDoor2025@cluster0.tj04exd.mongodb.net/genius_db?retryWrites=true&w=majority&appName=Cluster0"
+
+[functions]
+  node_bundler = "esbuild"
+  external_node_modules = ["sqlite3", "mongodb"]
+
+# Redirect API calls to Netlify Functions
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200
 
 [[redirects]]
   from = "/*"
