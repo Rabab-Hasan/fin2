@@ -1,9 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import clientEncryption from '../utils/encryption';
 
-const API_BASE = process.env.NODE_ENV === 'production' 
-  ? `${window.location.protocol}//${window.location.hostname}:2345`
-  : `${window.location.protocol}//${window.location.hostname}:2345`;
+const API_BASE = process.env.REACT_APP_API_URL || 'https://fin2-4.onrender.com';
+console.log('🔗 AuthContext API Base URL:', API_BASE);
 
 interface User {
   _id: string;

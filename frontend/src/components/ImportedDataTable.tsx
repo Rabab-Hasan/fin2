@@ -4,11 +4,7 @@ import { Calendar, Users, TrendingUp, Database } from 'lucide-react';
 import Card from './Card';
 import { useClient } from '../contexts/ClientContext';
 
-const API_BASE = process.env.NODE_ENV === 'production' 
-  ? `${window.location.protocol}//${window.location.hostname}:2345`
-  : `${window.location.protocol}//${window.location.hostname}:2345`;
-
-interface ImportedRecord {
+const API_BASE = process.env.REACT_APP_API_URL || 'https://fin2-4.onrender.com';interface ImportedRecord {
   report_date: string;
   registered_onboarded: number;
   linked_accounts: number;

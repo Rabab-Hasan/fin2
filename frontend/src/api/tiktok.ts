@@ -1,6 +1,4 @@
-const API_BASE = process.env.NODE_ENV === 'production' 
-  ? `${window.location.protocol}//${window.location.hostname}:2345/api`
-  : `${window.location.protocol}//${window.location.hostname}:2345/api`;
+const API_BASE = (process.env.REACT_APP_API_URL || 'https://fin2-4.onrender.com') + '/api';
 
 export const tiktokApi = {
   // Exchange auth code for access token

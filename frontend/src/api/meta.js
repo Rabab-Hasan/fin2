@@ -1,6 +1,4 @@
-const API_BASE_URL = process.env.NODE_ENV === 'production' 
-  ? `${window.location.protocol}//${window.location.hostname}:2345`
-  : `${window.location.protocol}//${window.location.hostname}:2345`;
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://fin2-4.onrender.com';
 
 export const metaApi = {
   // Get Meta OAuth URL

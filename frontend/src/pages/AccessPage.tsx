@@ -4,11 +4,7 @@ import { Users, Shield, Building, Mail, Edit3, Save, X, Plus } from 'lucide-reac
 import Card from '../components/Card';
 import { useAuth } from '../contexts/AuthContext';
 
-const API_BASE = process.env.NODE_ENV === 'production' 
-  ? `${window.location.protocol}//${window.location.hostname}:2345`
-  : `${window.location.protocol}//${window.location.hostname}:2345`;
-
-interface User {
+const API_BASE = process.env.REACT_APP_API_URL || 'https://fin2-4.onrender.com';interface User {
   _id: string;
   email: string;
   name: string;
