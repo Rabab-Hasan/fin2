@@ -49,17 +49,34 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const storedToken = clientEncryption.getSecureToken();
     const storedUser = clientEncryption.getSecureItem('user_data');
     
+    console.log('🔍 AuthContext: Loading stored data...', {
+      hasToken: !!storedToken,
+      hasUser: !!storedUser,
+      tokenLength: storedToken?.length,
+      userEmail: storedUser?.email
+    });
+    
     if (storedToken && storedUser) {
       try {
         setToken(storedToken);
         setUser(storedUser);
         
-        // Optionally verify token with backend
+        // Verify token with backend
         verifyToken(storedToken);
       } catch (error) {
         console.error('Error loading stored user data:', error);
         logout();
       }
+    } else {
+      // Clear any inconsistent state
+      console.log('🔍 AuthContext: No valid stored data, clearing state');
+      setToken(null);
+      setUser(null);
+      setAccessInfo(null);
+      
+      // Also clear any legacy localStorage
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('user');
     }
     
     setIsLoading(false);
@@ -156,6 +173,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isAuthenticated: !!user && !!token,
     isLoading,
   };
+
+  // Debug logging for authentication state
+  console.log('🔍 AuthContext: Current state:', {
+    hasUser: !!user,
+    hasToken: !!token,
+    isAuthenticated: !!user && !!token,
+    userEmail: user?.email,
+    isLoading
+  });
 
   return (
     <AuthContext.Provider value={value}>
