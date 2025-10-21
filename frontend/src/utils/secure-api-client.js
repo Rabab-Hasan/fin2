@@ -173,7 +173,7 @@ class SecureApiClient {
       // The password will be hashed securely on the server side
       const credentials = { email, password };
 
-      const response = await this.post('/auth/login', credentials, { encrypt: false });
+      const response = await this.post('/api/auth/login', credentials, { encrypt: false });
       
       if (response.token) {
         this.setAuthToken(response.token);
@@ -202,7 +202,7 @@ class SecureApiClient {
   // Health check
   async healthCheck() {
     try {
-      return await this.get('/health');
+      return await this.get('/api/health');
     } catch (error) {
       console.error('Health check failed:', error);
       throw error;
@@ -212,7 +212,7 @@ class SecureApiClient {
   // Secure user preferences
   async getUserPreferences() {
     try {
-      const response = await this.get('/user-preferences');
+      const response = await this.get('/api/user-preferences');
       
       // Store preferences securely on client-side
       clientEncryption.setSecurePreferences(response.preferences);
@@ -226,7 +226,7 @@ class SecureApiClient {
 
   async updateUserPreferences(preferences) {
     try {
-      const response = await this.put('/user-preferences', preferences);
+      const response = await this.put('/api/user-preferences', preferences);
       
       // Update secure client-side storage
       clientEncryption.setSecurePreferences(preferences);
