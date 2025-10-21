@@ -3,6 +3,27 @@ const router = express.Router();
 const { getDb } = require('../database-mongo');
 const AIAnalysisService = require('../services/aiAnalysisService');
 
+// Authentication middleware
+const jwt = require('jsonwebtoken');
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-here';
+
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ error: 'Access token required' });
+  }
+
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) {
+      return res.status(403).json({ error: 'Invalid or expired token' });
+    }
+    req.user = user;
+    next();
+  });
+}
+
 // Helper function to calculate derived fields
 function calculateDerivedFields(reportDate) {
   const date = new Date(reportDate);
@@ -41,7 +62,7 @@ function getMetricValue(record, metric) {
 }
 
 // Dashboard stats endpoint - NEW
-router.get('/dashboard-stats', async (req, res) => {
+router.get('/dashboard-stats', authenticateToken, async (req, res) => {
   try {
     const db = await getDb();
     const reportsCollection = db.collection('reports');
@@ -83,7 +104,7 @@ router.get('/dashboard-stats', async (req, res) => {
 });
 
 // Monthly Comparison endpoint
-router.get('/monthly-comparison', async (req, res) => {
+router.get('/monthly-comparison', authenticateToken, async (req, res) => {
   try {
     const { weeks = 'all', months, metric = 'total_advance_applicants', maxDays } = req.query;
     
@@ -233,7 +254,7 @@ router.get('/monthly-comparison', async (req, res) => {
 });
 
 // Weekly Comparison endpoint
-router.get('/weekly-comparison', async (req, res) => {
+router.get('/weekly-comparison', authenticateToken, async (req, res) => {
   try {
     const { days = '0', month, metric = 'total_advance_applicants' } = req.query;
     
@@ -304,7 +325,7 @@ router.get('/weekly-comparison', async (req, res) => {
 });
 
 // Daily/Weekly Analysis endpoint
-router.get('/daily-weekly', async (req, res) => {
+router.get('/daily-weekly', authenticateToken, async (req, res) => {
   try {
     const { weeks = 'all', months, metric = 'total_advance_applicants', view = 'weekly', startDate, endDate, weekdays } = req.query;
     
@@ -480,7 +501,7 @@ router.get('/daily-weekly', async (req, res) => {
 });
 
 // Best Month Analysis endpoint
-router.get('/best-month', async (req, res) => {
+router.get('/best-month', authenticateToken, async (req, res) => {
   try {
     const { metric = 'total_advance_applicants', weeks = 'all' } = req.query;
     
@@ -572,7 +593,7 @@ router.get('/best-month', async (req, res) => {
 });
 
 // Strategy Advisor endpoint
-router.get('/strategy-advisor', async (req, res) => {
+router.get('/strategy-advisor', authenticateToken, async (req, res) => {
   try {
     const { metric = 'total_advance_applicants', weeks = 'all', months = 'all' } = req.query;
     
@@ -630,7 +651,7 @@ router.get('/strategy-advisor', async (req, res) => {
 });
 
 // Weekday Performance Analysis endpoint - NEW
-router.get('/weekday-performance', async (req, res) => {
+router.get('/weekday-performance', authenticateToken, async (req, res) => {
   try {
     const db = await getDb();
     const reportsCollection = db.collection('reports');
