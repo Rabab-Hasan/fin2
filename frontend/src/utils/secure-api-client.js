@@ -9,7 +9,7 @@ console.log('🔗 React App API URL:', process.env.REACT_APP_API_URL);
 
 class SecureApiClient {
   constructor() {
-    this.baseURL = `${API_BASE}/api`;
+    this.baseURL = API_BASE;
     this.defaultHeaders = {
       'Content-Type': 'application/json',
     };
