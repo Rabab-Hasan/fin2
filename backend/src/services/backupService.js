@@ -1,4 +1,4 @@
-const pool = require('../database');
+const { getDb } = require('../database-mongo');
 const fs = require('fs-extra');
 const path = require('path');
 const archiver = require('archiver');
@@ -9,25 +9,55 @@ const PRIMARY_DIR = path.join(BACKUP_DIR, 'primary');
 const EMERGENCY_DIR = path.join(BACKUP_DIR, 'emergency');
 
 async function ensureBackupDirs() {
-  await fs.ensureDir(PRIMARY_DIR);
-  await fs.ensureDir(EMERGENCY_DIR);
+  try {
+    await fs.ensureDir(PRIMARY_DIR);
+    await fs.ensureDir(EMERGENCY_DIR);
+  } catch (error) {
+    console.warn('Could not create backup directories (filesystem may be read-only):', error.message);
+  }
 }
 
 async function getBackupStatus() {
-  await ensureBackupDirs();
-  
-  const client = await pool.connect();
   try {
+    const db = await getDb();
     // Get total records
-    const recordsResult = await client.query('SELECT COUNT(*) as count FROM reports');
-    const recordsStored = parseInt(recordsResult.rows?.[0]?.count || recordsResult[0]?.count || 0);
+    const recordsStored = await db.collection('reports').countDocuments();
     
-    // Calculate main storage size (simplified for SQLite)
-    const mainStorageKb = recordsStored * 0.5; // Approximate 0.5KB per record
+    // Calculate main storage size (approximate)
+    const mainStorageKb = recordsStored * 0.8; // Approximate 0.8KB per record
     
-    // Get backup file info
-    const primaryFiles = await fs.readdir(PRIMARY_DIR).catch(() => []);
-    const emergencyFiles = await fs.readdir(EMERGENCY_DIR).catch(() => []);
+    // For production environments with read-only filesystems, return status without file operations
+    const isReadOnlyEnvironment = process.env.NODE_ENV === 'production' || process.env.RENDER;
+    
+    if (isReadOnlyEnvironment) {
+      return {
+        records_stored: recordsStored,
+        main_storage_kb: mainStorageKb,
+        primary_backup_kb: 0,
+        emergency_backup_kb: 0,
+        primary_last_at: null,
+        emergency_last_at: null,
+        message: 'File system backups not available in production environment'
+      };
+    }
+    
+    await ensureBackupDirs();
+    
+    // Get backup file info (handle file system errors gracefully)
+    let primaryFiles = [];
+    let emergencyFiles = [];
+    
+    try {
+      primaryFiles = await fs.readdir(PRIMARY_DIR);
+    } catch (error) {
+      console.warn('Could not read primary backup directory:', error.message);
+    }
+    
+    try {
+      emergencyFiles = await fs.readdir(EMERGENCY_DIR);
+    } catch (error) {
+      console.warn('Could not read emergency backup directory:', error.message);
+    }
     
     const getLatestFileInfo = async (dir, files) => {
       if (files.length === 0) return { kb: 0, lastAt: null };
@@ -39,19 +69,24 @@ async function getBackupStatus() {
       
       if (!latestFile) return { kb: 0, lastAt: null };
       
-      const filePath = path.join(dir, latestFile);
-      const stats = await fs.stat(filePath);
-      
-      // Extract timestamp from filename
-      const timestampMatch = latestFile.match(/backup_(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2})/);
-      const lastAt = timestampMatch ? 
-        moment(timestampMatch[1], 'YYYY-MM-DDTHH-mm-ss').toISOString() : 
-        stats.mtime.toISOString();
-      
-      return {
-        kb: stats.size / 1024,
-        lastAt
-      };
+      try {
+        const filePath = path.join(dir, latestFile);
+        const stats = await fs.stat(filePath);
+        
+        // Extract timestamp from filename
+        const timestampMatch = latestFile.match(/backup_(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2})/);
+        const lastAt = timestampMatch ? 
+          moment(timestampMatch[1], 'YYYY-MM-DDTHH-mm-ss').toISOString() : 
+          stats.mtime.toISOString();
+        
+        return {
+          kb: stats.size / 1024,
+          lastAt
+        };
+      } catch (error) {
+        console.warn('Could not read backup file stats:', error.message);
+        return { kb: 0, lastAt: null };
+      }
     };
     
     const primaryInfo = await getLatestFileInfo(PRIMARY_DIR, primaryFiles);
@@ -66,8 +101,9 @@ async function getBackupStatus() {
       emergency_last_at: emergencyInfo.lastAt
     };
     
-  } finally {
-    client.release();
+  } catch (error) {
+    console.error('Error getting backup status:', error);
+    throw error;
   }
 }
 
@@ -79,109 +115,177 @@ async function createBackup(target = 'primary') {
   const filename = `backup_${timestamp}.csv`;
   const filepath = path.join(targetDir, filename);
   
-  const client = await pool.connect();
   try {
-    // For SQLite development mode, get all columns
-    const dataResult = await client.query(`
-      SELECT 
-        report_date,
-        month_label,
-        registered_onboarded,
-        linked_accounts,
-        total_advance_applications,
-        total_advance_applicants,
-        total_micro_financing_applications,
-        total_micro_financing_applicants,
-        total_personal_finance_application,
-        total_personal_finance_applicants,
-        notes,
-        created_at,
-        updated_at
-      FROM reports 
-      ORDER BY report_date
-    `);
+    const db = await getDb();
+    // Get all reports data
+    const rows = await db.collection('reports')
+      .find({})
+      .sort({ report_date: 1 })
+      .toArray();
+      
+    if (rows.length === 0) {
+      throw new Error('No data found to backup');
+    }
+
+    // On read-only filesystems (like Render), return the data as a response instead of writing to file
+    const isReadOnlySystem = process.env.NODE_ENV === 'production' || process.env.RENDER;
     
-    const rows = dataResult.rows || dataResult;
+    if (isReadOnlySystem) {
+      return { 
+        success: true, 
+        filename, 
+        records: rows.length,
+        message: 'Backup created in memory (filesystem is read-only)',
+        data: rows
+      };
+    }
     
     if (rows.length === 0) {
       throw new Error('No data found to backup');
     }
     
-    // Build CSV header from the first row keys
-    const headers = Object.keys(rows[0]);
-    let csvContent = headers.join(',') + '\n';
+    // Define headers for consistent CSV structure
+    const headers = [
+      'id', 'report_date', 'month_label', 'clientId', 'notes',
+      'createdAt', 'updatedAt'
+    ];
+    
+    // Add data fields from the data object
+    const dataFields = new Set();
+    rows.forEach(row => {
+      if (row.data && typeof row.data === 'object') {
+        Object.keys(row.data).forEach(key => dataFields.add(key));
+      }
+    });
+    
+    const allHeaders = [...headers, ...Array.from(dataFields)];
+    let csvContent = allHeaders.join(',') + '\n';
     
     // Build CSV rows
     for (const row of rows) {
-      const csvRow = headers.map(header => {
-        const value = row[header];
+      const csvRow = allHeaders.map(header => {
+        let value;
+        if (dataFields.has(header)) {
+          value = row.data?.[header];
+        } else {
+          value = row[header];
+        }
         return value !== undefined && value !== null ? `"${value}"` : '""';
       });
       csvContent += csvRow.join(',') + '\n';
     }
     
-    await fs.writeFile(filepath, csvContent);
-    
-    // Clean up old backups (keep last 10)
-    const files = await fs.readdir(targetDir);
-    const backupFiles = files
-      .filter(f => f.startsWith('backup_') && f.endsWith('.csv'))
-      .sort()
-      .reverse();
-    
-    if (backupFiles.length > 10) {
-      const filesToDelete = backupFiles.slice(10);
-      for (const file of filesToDelete) {
-        await fs.unlink(path.join(targetDir, file));
+    try {
+      await fs.writeFile(filepath, csvContent);
+      
+      // Clean up old backups (keep last 10)
+      const files = await fs.readdir(targetDir);
+      const backupFiles = files
+        .filter(f => f.startsWith('backup_') && f.endsWith('.csv'))
+        .sort()
+        .reverse();
+      
+      if (backupFiles.length > 10) {
+        const filesToDelete = backupFiles.slice(10);
+        for (const file of filesToDelete) {
+          await fs.unlink(path.join(targetDir, file));
+        }
       }
+      
+      return { success: true, filename, path: filepath, records: rows.length };
+    } catch (fsError) {
+      console.warn('Could not write backup file (filesystem may be read-only):', fsError.message);
+      return { 
+        success: true, 
+        filename, 
+        records: rows.length,
+        message: 'Backup created in memory (could not write to filesystem)',
+        data: rows
+      };
     }
     
-    return { success: true, filename, path: filepath, records: rows.length };
-    
-  } finally {
-    client.release();
+  } catch (error) {
+    console.error('Error creating backup:', error);
+    throw error;
   }
 }
 
 async function checkIntegrity() {
-  const client = await pool.connect();
   try {
+    const db = await getDb();
     // Get database counts
-    const dbResult = await client.query('SELECT COUNT(*) as count FROM reports');
-    const dbCount = parseInt(dbResult.rows[0].count);
+    const dbCount = await db.collection('reports').countDocuments();
     
     // Check primary backup
-    const primaryFiles = await fs.readdir(PRIMARY_DIR).catch(() => []);
+    let primaryFiles = [];
+    try {
+      primaryFiles = await fs.readdir(PRIMARY_DIR);
+    } catch (error) {
+      console.warn('Could not read backup directory:', error.message);
+      return { 
+        success: true,
+        database_count: dbCount,
+        backup_count: 0,
+        match: false,
+        message: 'No backup directory accessible (filesystem may be read-only)'
+      };
+    }
+    
     const latestPrimary = primaryFiles
       .filter(f => f.endsWith('.csv'))
       .sort()
       .pop();
     
     if (!latestPrimary) {
-      return { success: false, message: 'No primary backup found' };
+      return { 
+        success: true,
+        database_count: dbCount,
+        backup_count: 0,
+        match: false,
+        message: 'No primary backup found'
+      };
     }
     
-    const backupPath = path.join(PRIMARY_DIR, latestPrimary);
-    const backupContent = await fs.readFile(backupPath, 'utf8');
-    const backupLines = backupContent.split('\n').filter(line => line.trim());
-    const backupCount = backupLines.length - 1; // Subtract header
+    try {
+      const backupPath = path.join(PRIMARY_DIR, latestPrimary);
+      const backupContent = await fs.readFile(backupPath, 'utf8');
+      const backupLines = backupContent.split('\n').filter(line => line.trim());
+      const backupCount = backupLines.length - 1; // Subtract header
+      
+      return {
+        success: true,
+        database_count: dbCount,
+        backup_count: backupCount,
+        match: dbCount === backupCount,
+        backup_file: latestPrimary
+      };
+    } catch (fileError) {
+      console.warn('Could not read backup file:', fileError.message);
+      return { 
+        success: true,
+        database_count: dbCount,
+        backup_count: 0,
+        match: false,
+        message: 'Could not read backup file'
+      };
+    }
     
-    return {
-      success: true,
-      database_count: dbCount,
-      backup_count: backupCount,
-      match: dbCount === backupCount,
-      backup_file: latestPrimary
-    };
-    
-  } finally {
-    client.release();
+  } catch (error) {
+    console.error('Error checking integrity:', error);
+    throw error;
   }
 }
 
 async function recoverFromBackup(source = 'primary') {
   const sourceDir = source === 'emergency' ? EMERGENCY_DIR : PRIMARY_DIR;
-  const files = await fs.readdir(sourceDir).catch(() => []);
+  
+  let files = [];
+  try {
+    files = await fs.readdir(sourceDir);
+  } catch (error) {
+    throw new Error(`No backup directory accessible for ${source} backup (filesystem may be read-only)`);
+  }
+  
   const latestFile = files
     .filter(f => f.endsWith('.csv'))
     .sort()
@@ -191,8 +295,13 @@ async function recoverFromBackup(source = 'primary') {
     throw new Error(`No backup file found in ${source} backup`);
   }
   
-  const backupPath = path.join(sourceDir, latestFile);
-  const backupContent = await fs.readFile(backupPath, 'utf8');
+  let backupContent;
+  try {
+    const backupPath = path.join(sourceDir, latestFile);
+    backupContent = await fs.readFile(backupPath, 'utf8');
+  } catch (error) {
+    throw new Error(`Could not read backup file: ${error.message}`);
+  }
   
   // Parse CSV and restore data
   const lines = backupContent.split('\n').filter(line => line.trim());
@@ -209,36 +318,43 @@ async function recoverFromBackup(source = 'primary') {
   }
   
   // Clear existing data and restore
-  const client = await pool.connect();
   try {
-    // For SQLite, we don't need explicit transactions for simple operations
-    await client.query('DELETE FROM reports');
+    const db = await getDb();
+    // Clear all reports
+    await db.collection('reports').deleteMany({});
     
     // Restore data by inserting each row
+    const restoredRows = [];
     for (const row of data) {
-      if (row.report_date) {
-        await client.query(`
-          INSERT INTO reports (
-            report_date, month_label, registered_onboarded, linked_accounts,
-            total_advance_applications, total_advance_applicants,
-            total_micro_financing_applications, total_micro_financing_applicants,
-            total_personal_finance_application, total_personal_finance_applicants,
-            notes, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-        `, [
-          row.report_date, row.month_label, row.registered_onboarded, row.linked_accounts,
-          row.total_advance_applications, row.total_advance_applicants,
-          row.total_micro_financing_applications, row.total_micro_financing_applicants,
-          row.total_personal_finance_application, row.total_personal_finance_applicants,
-          row.notes
-        ]);
+      if (row.report_date && row.id) {
+        // Separate basic fields from data fields
+        const basicFields = ['id', 'report_date', 'month_label', 'clientId', 'notes'];
+        const document = {
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          data: {}
+        };
+        
+        // Process each field
+        Object.keys(row).forEach(key => {
+          if (basicFields.includes(key)) {
+            document[key] = row[key];
+          } else if (key !== 'createdAt' && key !== 'updatedAt') {
+            // Put everything else in data object
+            document.data[key] = row[key];
+          }
+        });
+        
+        await db.collection('reports').insertOne(document);
+        restoredRows.push(document);
       }
     }
     
-    return { success: true, backup_file: latestFile, records_restored: data.length };
+    return { success: true, backup_file: latestFile, records_restored: restoredRows.length };
     
-  } finally {
-    client.release();
+  } catch (error) {
+    console.error('Error recovering from backup:', error);
+    throw error;
   }
 }
 

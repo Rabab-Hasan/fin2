@@ -2,8 +2,29 @@ const express = require('express');
 const { getBackupStatus, createBackup, checkIntegrity, recoverFromBackup } = require('../services/backupService');
 const router = express.Router();
 
+// Authentication middleware
+const jwt = require('jsonwebtoken');
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-here';
+
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ error: 'Access token required' });
+  }
+
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) {
+      return res.status(403).json({ error: 'Invalid or expired token' });
+    }
+    req.user = user;
+    next();
+  });
+}
+
 // GET /api/backup/status - Get backup status
-router.get('/status', async (req, res) => {
+router.get('/status', authenticateToken, async (req, res) => {
   try {
     const status = await getBackupStatus();
     res.json(status);
@@ -14,7 +35,7 @@ router.get('/status', async (req, res) => {
 });
 
 // POST /api/backup/run - Create a backup
-router.post('/run', async (req, res) => {
+router.post('/run', authenticateToken, async (req, res) => {
   try {
     const { target = 'primary' } = req.query;
     
@@ -31,7 +52,7 @@ router.post('/run', async (req, res) => {
 });
 
 // POST /api/backup/integrity - Check data integrity
-router.post('/integrity', async (req, res) => {
+router.post('/integrity', authenticateToken, async (req, res) => {
   try {
     const result = await checkIntegrity();
     res.json(result);
@@ -42,7 +63,7 @@ router.post('/integrity', async (req, res) => {
 });
 
 // POST /api/backup/recover - Recover from backup (admin only)
-router.post('/recover', async (req, res) => {
+router.post('/recover', authenticateToken, async (req, res) => {
   try {
     const { source = 'primary' } = req.query;
     
