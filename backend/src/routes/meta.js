@@ -38,11 +38,17 @@ router.get('/auth-url', authenticateToken, (req, res) => {
     const state = Math.random().toString(36).substring(2, 15);
     const scope = 'pages_show_list,pages_read_engagement,instagram_basic,instagram_content_publish,business_management';
     
+    console.log('🔗 Meta OAuth - Using redirect URI:', META_REDIRECT_URI);
+    
     const authUrl = `${META_AUTH_URL}?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(META_REDIRECT_URI)}&scope=${encodeURIComponent(scope)}&response_type=code&state=${state}`;
     
     res.json({ 
       authUrl,
-      state 
+      state,
+      debug: {
+        redirect_uri: META_REDIRECT_URI,
+        app_id: META_APP_ID
+      }
     });
   } catch (error) {
     console.error('Error generating Meta auth URL:', error);
