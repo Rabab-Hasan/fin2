@@ -4,7 +4,7 @@ const axios = require('axios');
 
 const META_APP_ID = process.env.META_APP_ID;
 const META_APP_SECRET = process.env.META_APP_SECRET;
-const META_REDIRECT_URI = process.env.META_REDIRECT_URI;
+const META_REDIRECT_URI = process.env.META_REDIRECT_URI || 'https://actionlabs.netlify.app/meta-auth-callback';
 
 // Authentication middleware
 const jwt = require('jsonwebtoken');
