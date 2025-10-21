@@ -6,7 +6,7 @@ const router = express.Router();
 const TIKTOK_CONFIG = {
   APP_ID: '7522384605962469377',
   SECRET: '909b6467cb06a246db4ef2149ee5a0fd454fd019',
-  REDIRECT_URI: 'http://localhost:3000/tiktok-auth-callback',
+  REDIRECT_URI: process.env.TIKTOK_REDIRECT_URI || 'https://actionlabs.netlify.app/tiktok-auth-callback',
   API_BASE_URL: 'https://business-api.tiktok.com/open_api/v1.3'
 };
 

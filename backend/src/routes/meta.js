@@ -6,13 +6,34 @@ const META_APP_ID = process.env.META_APP_ID;
 const META_APP_SECRET = process.env.META_APP_SECRET;
 const META_REDIRECT_URI = process.env.META_REDIRECT_URI;
 
+// Authentication middleware
+const jwt = require('jsonwebtoken');
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-here';
+
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ error: 'Access token required' });
+  }
+
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) {
+      return res.status(403).json({ error: 'Invalid or expired token' });
+    }
+    req.user = user;
+    next();
+  });
+}
+
 // Meta OAuth URLs
 const META_AUTH_URL = 'https://www.facebook.com/v18.0/dialog/oauth';
 const META_TOKEN_URL = 'https://graph.facebook.com/v18.0/oauth/access_token';
 const META_API_BASE = 'https://graph.facebook.com/v18.0';
 
 // Get Meta OAuth URL
-router.get('/auth-url', (req, res) => {
+router.get('/auth-url', authenticateToken, (req, res) => {
   try {
     const state = Math.random().toString(36).substring(2, 15);
     const scope = 'pages_show_list,pages_read_engagement,instagram_basic,instagram_content_publish,business_management';
@@ -30,7 +51,7 @@ router.get('/auth-url', (req, res) => {
 });
 
 // Exchange authorization code for access token
-router.post('/callback', async (req, res) => {
+router.post('/callback', authenticateToken, async (req, res) => {
   try {
     const { code, state } = req.body;
     

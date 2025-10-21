@@ -1,38 +1,21 @@
+import secureApiClient from '../utils/secure-api-client';
+
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://fin2-4.onrender.com';
 
 export const metaApi = {
   // Get Meta OAuth URL
   getAuthUrl: async () => {
-    const response = await fetch(`${API_BASE_URL}/api/meta/auth-url`);
-    if (!response.ok) {
-      throw new Error('Failed to get Meta auth URL');
-    }
-    return response.json();
+    return secureApiClient.get('/api/meta/auth-url');
   },
 
   // Handle OAuth callback
   handleCallback: async (code, state) => {
-    const response = await fetch(`${API_BASE_URL}/api/meta/callback`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ code, state }),
-    });
-    
-    if (!response.ok) {
-      throw new Error('Failed to complete Meta authentication');
-    }
-    return response.json();
+    return secureApiClient.post('/api/meta/callback', { code, state });
   },
 
   // Get Facebook pages
   getPages: async (accessToken) => {
-    const response = await fetch(`${API_BASE_URL}/api/meta/pages?access_token=${accessToken}`);
-    if (!response.ok) {
-      throw new Error('Failed to fetch Facebook pages');
-    }
-    return response.json();
+    return secureApiClient.get(`/api/meta/pages?access_token=${accessToken}`);
   },
 
   // Get Instagram accounts
