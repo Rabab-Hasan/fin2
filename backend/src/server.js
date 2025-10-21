@@ -19,6 +19,7 @@ app.use(logAuthentication);
 app.use(cors({
   origin: [
     'https://findashr.netlify.app',
+    'https://actionlabs.netlify.app',
     'http://localhost:3000',
     'http://localhost:2345'
   ],
