@@ -10,7 +10,7 @@ export const analyticsApi = {
     if (params.months) searchParams.append('months', params.months);
     if (params.metric) searchParams.append('metric', params.metric);
     
-    return secureApiClient.get(`/analytics/monthly-comparison?${searchParams}`);
+    return secureApiClient.get(`/api/analytics/monthly-comparison?${searchParams}`);
   },
 
   // Weekly Comparison
@@ -20,7 +20,7 @@ export const analyticsApi = {
     if (params.month) searchParams.append('month', params.month);
     if (params.metric) searchParams.append('metric', params.metric);
     
-    return secureApiClient.get(`/analytics/weekly-comparison?${searchParams}`);
+    return secureApiClient.get(`/api/analytics/weekly-comparison?${searchParams}`);
   },
 
   // Best Month Analysis
@@ -29,7 +29,7 @@ export const analyticsApi = {
     if (params.metric) searchParams.append('metric', params.metric);
     if (params.weeks) searchParams.append('weeks', params.weeks);
     
-    return secureApiClient.get(`/analytics/best-month?${searchParams}`);
+    return secureApiClient.get(`/api/analytics/best-month?${searchParams}`);
   },
 
   // Strategy Advisor
@@ -39,23 +39,23 @@ export const analyticsApi = {
     if (params.weeks) searchParams.append('weeks', params.weeks);
     if (params.months) searchParams.append('months', params.months);
     
-    return secureApiClient.get(`/analytics/strategy-advisor?${searchParams}`);
+    return secureApiClient.get(`/api/analytics/strategy-advisor?${searchParams}`);
   }
 };
 
 export const notesApi = {
   // Create a note
   create: (noteData) => {
-    return secureApiClient.post('/notes', noteData);
+    return secureApiClient.post('/api/notes', noteData);
   },
 
   // Get all notes
   getAll: () => {
-    return secureApiClient.get('/notes');
+    return secureApiClient.get('/api/notes');
   },
 
   // Delete a note
   delete: (id) => {
-    return secureApiClient.delete(`/notes/${id}`);
+    return secureApiClient.delete(`/api/notes/${id}`);
   }
 };

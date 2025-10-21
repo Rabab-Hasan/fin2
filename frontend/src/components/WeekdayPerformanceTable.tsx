@@ -47,7 +47,7 @@ const WeekdayPerformanceTable: React.FC = () => {
         params.append('weekday', selectedWeekday);
       }
       
-      return secureApiClient.get(`/analytics/weekday-performance?${params}`);
+      return secureApiClient.get(`/api/analytics/weekday-performance?${params}`);
     }
   });
 

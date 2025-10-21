@@ -54,7 +54,7 @@ const analyticsApi = {
     if (params.weeks) searchParams.append('weeks', params.weeks);
     if (params.months) searchParams.append('months', params.months);
     
-    return secureApiClient.get(`/analytics/strategy-advisor?${searchParams}`);
+    return secureApiClient.get(`/api/analytics/strategy-advisor?${searchParams}`);
   }
 };
 

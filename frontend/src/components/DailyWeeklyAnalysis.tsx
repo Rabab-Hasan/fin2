@@ -29,11 +29,11 @@ const analyticsApi = {
     if (params.weekdays) searchParams.append('weekdays', params.weekdays);
     searchParams.append('clientId', clientId);
     
-    return secureApiClient.get(`/analytics/daily-weekly?${searchParams}`);
+    return secureApiClient.get(`/api/analytics/daily-weekly?${searchParams}`);
   },
   
   getDayNotes: async (date: string) => {
-    return secureApiClient.get(`/notes/day/${date}`);
+    return secureApiClient.get(`/api/notes/day/${date}`);
   },
 
   getAllNotes: async () => {

@@ -26,7 +26,7 @@ const analyticsApi = {
     if (params.maxDays) searchParams.append('maxDays', params.maxDays);
     searchParams.append('clientId', clientId);
     
-    return secureApiClient.get(`/analytics/monthly-comparison?${searchParams}`);
+    return secureApiClient.get(`/api/analytics/monthly-comparison?${searchParams}`);
   },
   getMonthlyComparisonAllMetrics: async (params: any, clientId: string) => {
     // Fetch data for all metrics to populate the cards
@@ -40,7 +40,7 @@ const analyticsApi = {
       searchParams.append('clientId', clientId);
       
       try {
-        const data = await secureApiClient.get(`/analytics/monthly-comparison?${searchParams}`);
+        const data = await secureApiClient.get(`/api/analytics/monthly-comparison?${searchParams}`);
         allMetricsData[metric.key] = data;
       } catch (error) {
         console.warn(`Failed to fetch data for ${metric.key}:`, error);

@@ -26,7 +26,7 @@ const analyticsApi = {
     if (params.month) searchParams.append('month', params.month);
     if (params.metric) searchParams.append('metric', params.metric);
     
-    return secureApiClient.get(`/analytics/weekly-comparison?${searchParams}`);
+    return secureApiClient.get(`/api/analytics/weekly-comparison?${searchParams}`);
   },
   getAllNotes: async () => {
     const response = await fetch('/api/notes');

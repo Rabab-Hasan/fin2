@@ -23,10 +23,10 @@ const analyticsApi = {
     if (params.metric) searchParams.append('metric', params.metric);
     if (params.weeks) searchParams.append('weeks', params.weeks);
     
-    return secureApiClient.get(`/analytics/best-month?${searchParams}`);
+    return secureApiClient.get(`/api/analytics/best-month?${searchParams}`);
   },
   getAllNotes: async () => {
-    return secureApiClient.get('/notes');
+    return secureApiClient.get('/api/notes');
   }
 };
 
