@@ -31,12 +31,19 @@ router.post('/login', async (req, res) => {
     // Check password
     let isValidPassword = false;
     
+    // Get the password from either 'password' or 'password_hash' field
+    const storedPassword = user.password || user.password_hash;
+    
+    if (!storedPassword) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    
     // If password is hashed, compare with bcrypt
-    if (user.password && user.password.startsWith('$')) {
-      isValidPassword = await bcrypt.compare(password, user.password);
+    if (storedPassword.startsWith('$')) {
+      isValidPassword = await bcrypt.compare(password, storedPassword);
     } else {
       // If password is plain text (not recommended for production)
-      isValidPassword = password === user.password;
+      isValidPassword = password === storedPassword;
     }
 
     if (!isValidPassword) {
