@@ -5,6 +5,27 @@ const { getDb } = require('../database-mongo');
 const { ObjectId } = require('mongodb');
 const { createCampaignAssignmentNotification } = require('./notifications');
 
+// Authentication middleware
+const jwt = require('jsonwebtoken');
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-here';
+
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ error: 'Access token required' });
+  }
+
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) {
+      return res.status(403).json({ error: 'Invalid or expired token' });
+    }
+    req.user = user;
+    next();
+  });
+}
+
 // Activity task templates - auto-generated tasks based on selected activities
 const ACTIVITY_TASK_TEMPLATES = {
   'video_ads': [
@@ -318,7 +339,7 @@ async function createCampaignTasks(campaignId, activities, clientId, createdBy) 
 }
 
 // GET /api/campaigns - Get all campaigns for a client
-router.get('/', async (req, res) => {
+router.get('/', authenticateToken, async (req, res) => {
   try {
     const { client_id } = req.query;
     
@@ -354,7 +375,7 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/campaigns/:id/validate - AI validation endpoint
-router.post('/:id/validate', async (req, res) => {
+router.post('/:id/validate', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const campaignData = req.body;
@@ -380,7 +401,7 @@ router.post('/:id/validate', async (req, res) => {
 });
 
 // GET /api/campaigns/:id - Get a specific campaign
-router.get('/:id', async (req, res) => {
+router.get('/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -432,7 +453,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST /api/campaigns - Create new campaign
-router.post('/', async (req, res) => {
+router.post('/', authenticateToken, async (req, res) => {
   try {
     const {
       name,
@@ -641,7 +662,7 @@ router.post('/', async (req, res) => {
 });
 
 // GET /api/campaigns/:id/tasks - Get tasks for a specific campaign
-router.get('/:id/tasks', async (req, res) => {
+router.get('/:id/tasks', authenticateToken, async (req, res) => {
   try {
     const { id: campaignId } = req.params;
     const { client_id } = req.query;
@@ -691,7 +712,7 @@ router.get('/:id/tasks', async (req, res) => {
 });
 
 // Link a task to a campaign
-router.post('/tasks/link', async (req, res) => {
+router.post('/tasks/link', authenticateToken, async (req, res) => {
   try {
     const { campaignId, taskId, activityType = 'custom' } = req.body;
 
