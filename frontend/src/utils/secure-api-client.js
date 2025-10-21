@@ -2,10 +2,10 @@
 import clientEncryption from './encryption.js';
 
 // Use Render backend for production, localhost for development
-const API_BASE = process.env.REACT_APP_API_URL || 
-  (process.env.NODE_ENV === 'production' 
-    ? 'https://fin2-4.onrender.com' 
-    : 'http://localhost:2345');
+const API_BASE = process.env.REACT_APP_API_URL || 'https://fin2-4.onrender.com';
+console.log('🔗 API Base URL:', API_BASE);
+console.log('🔗 Environment:', process.env.NODE_ENV);
+console.log('🔗 React App API URL:', process.env.REACT_APP_API_URL);
 
 class SecureApiClient {
   constructor() {
