@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { useAuth } from './AuthContext';
 
 interface Notification {
   id: number;
@@ -34,27 +35,15 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(false);
+  const { user } = useAuth();
 
-  // Get current user ID (you'll need to implement this based on your auth system)
+  // Get current user ID from AuthContext
   const getCurrentUserId = (): string | null => {
-    // This should be replaced with your actual auth logic
-    const user = localStorage.getItem('user');
-    console.log('Raw user data from localStorage:', user);
-    
-    if (user) {
-      try {
-        const parsedUser = JSON.parse(user);
-        console.log('Parsed user data:', parsedUser);
-        
-        const userId = parsedUser._id || parsedUser.id;
-        console.log('Extracted user ID:', userId);
-        
-        return userId;
-      } catch (error) {
-        console.error('Error parsing user data:', error);
-      }
+    if (user?._id) {
+      console.log('✅ NotificationContext: Got user ID from AuthContext:', user._id);
+      return user._id;
     }
-    console.log('No user data found in localStorage');
+    console.log('⚠️ NotificationContext: No user found in AuthContext');
     return null;
   };
 
