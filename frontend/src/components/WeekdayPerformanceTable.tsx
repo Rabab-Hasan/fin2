@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Calendar, TrendingUp, TrendingDown, Filter } from 'lucide-react';
 import Card from './Card';
+import secureApiClient from '../utils/secure-api-client';
 
 const WEEKDAYS = [
   { value: 'all', label: 'All Days' },
@@ -46,11 +47,7 @@ const WeekdayPerformanceTable: React.FC = () => {
         params.append('weekday', selectedWeekday);
       }
       
-      const response = await fetch(`/api/analytics/weekday-performance?${params}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch weekday performance data');
-      }
-      return response.json();
+      return secureApiClient.get(`/analytics/weekday-performance?${params}`);
     }
   });
 

@@ -1,3 +1,5 @@
+import secureApiClient from '../utils/secure-api-client';
+
 const API_BASE_URL = (process.env.REACT_APP_API_URL || 'https://fin2-4.onrender.com') + '/api';
 
 export const analyticsApi = {
@@ -8,8 +10,7 @@ export const analyticsApi = {
     if (params.months) searchParams.append('months', params.months);
     if (params.metric) searchParams.append('metric', params.metric);
     
-    return fetch(`${API_BASE}/analytics/monthly-comparison?${searchParams}`)
-      .then(res => res.json());
+    return secureApiClient.get(`/analytics/monthly-comparison?${searchParams}`);
   },
 
   // Weekly Comparison
@@ -19,8 +20,7 @@ export const analyticsApi = {
     if (params.month) searchParams.append('month', params.month);
     if (params.metric) searchParams.append('metric', params.metric);
     
-    return fetch(`${API_BASE}/analytics/weekly-comparison?${searchParams}`)
-      .then(res => res.json());
+    return secureApiClient.get(`/analytics/weekly-comparison?${searchParams}`);
   },
 
   // Best Month Analysis
@@ -29,8 +29,7 @@ export const analyticsApi = {
     if (params.metric) searchParams.append('metric', params.metric);
     if (params.weeks) searchParams.append('weeks', params.weeks);
     
-    return fetch(`${API_BASE}/analytics/best-month?${searchParams}`)
-      .then(res => res.json());
+    return secureApiClient.get(`/analytics/best-month?${searchParams}`);
   },
 
   // Strategy Advisor
@@ -40,33 +39,23 @@ export const analyticsApi = {
     if (params.weeks) searchParams.append('weeks', params.weeks);
     if (params.months) searchParams.append('months', params.months);
     
-    return fetch(`${API_BASE}/analytics/strategy-advisor?${searchParams}`)
-      .then(res => res.json());
+    return secureApiClient.get(`/analytics/strategy-advisor?${searchParams}`);
   }
 };
 
 export const notesApi = {
   // Create a note
   create: (noteData) => {
-    return fetch(`${API_BASE}/notes`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(noteData),
-    }).then(res => res.json());
+    return secureApiClient.post('/notes', noteData);
   },
 
   // Get all notes
   getAll: () => {
-    return fetch(`${API_BASE}/notes`)
-      .then(res => res.json());
+    return secureApiClient.get('/notes');
   },
 
   // Delete a note
   delete: (id) => {
-    return fetch(`${API_BASE}/notes/${id}`, {
-      method: 'DELETE',
-    }).then(res => res.json());
+    return secureApiClient.delete(`/notes/${id}`);
   }
 };

@@ -4,6 +4,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { TrendingUp, Calendar, BarChart3, PieChart, LineChart, Users, CreditCard, Target, ArrowUp, ArrowDown, Minus, StickyNote } from 'lucide-react';
 import Card from './Card';
 import { useClient } from '../contexts/ClientContext';
+import secureApiClient from '../utils/secure-api-client';
 
 const METRICS = [
   { key: 'registered_onboarded', label: 'Registered Onboarded', icon: Users, color: '#3B82F6' },
@@ -28,15 +29,11 @@ const analyticsApi = {
     if (params.weekdays) searchParams.append('weekdays', params.weekdays);
     searchParams.append('clientId', clientId);
     
-    const response = await fetch(`/api/analytics/daily-weekly?${searchParams}`);
-    if (!response.ok) throw new Error('Failed to fetch daily/weekly analysis');
-    return response.json();
+    return secureApiClient.get(`/analytics/daily-weekly?${searchParams}`);
   },
   
   getDayNotes: async (date: string) => {
-    const response = await fetch(`/api/notes/day/${date}`);
-    if (!response.ok) throw new Error('Failed to fetch day notes');
-    return response.json();
+    return secureApiClient.get(`/notes/day/${date}`);
   },
 
   getAllNotes: async () => {

@@ -119,7 +119,7 @@ router.get('/stats', authenticateToken, async (req, res) => {
     // Get total records count
     const total_records = await reportsCollection.countDocuments(filter);
     
-    // Get unique months for this client - handle both string and date formats
+    // Get unique months for this client - handle all date formats safely
     let months_tracked = 0;
     try {
       const monthsAggregation = [
@@ -127,13 +127,33 @@ router.get('/stats', authenticateToken, async (req, res) => {
         {
           $project: {
             month: {
-              $cond: {
-                if: { $type: { $toDate: "$report_date" } },
-                then: { $dateToString: { format: "%Y-%m", date: { $toDate: "$report_date" } } },
-                else: { $substr: ["$report_date", 0, 7] }  // Extract YYYY-MM from string
+              $switch: {
+                branches: [
+                  // Case 1: ISO date string (2025-10-21T07:05:12.943Z)
+                  {
+                    case: { $regexMatch: { input: "$report_date", regex: /^\d{4}-\d{2}-\d{2}T/ } },
+                    then: { $substr: ["$report_date", 0, 7] }
+                  },
+                  // Case 2: Simple date string (2025-07-19)
+                  {
+                    case: { $regexMatch: { input: "$report_date", regex: /^\d{4}-\d{2}-\d{2}$/ } },
+                    then: { $substr: ["$report_date", 0, 7] }
+                  }
+                ],
+                // Default case: try to extract first 7 chars or use fallback
+                default: { 
+                  $cond: {
+                    if: { $gte: [{ $strLenCP: { $toString: "$report_date" } }, 7] },
+                    then: { $substr: [{ $toString: "$report_date" }, 0, 7] },
+                    else: "unknown"
+                  }
+                }
               }
             }
           }
+        },
+        {
+          $match: { month: { $ne: "unknown" } }
         },
         {
           $group: {

@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Trophy, Info, Award, Target, TrendingUp, Star, Medal, Crown } from 'lucide-react';
 import Card from './Card';
+import secureApiClient from '../utils/secure-api-client';
 
 const METRICS = [
   { key: 'registered_onboarded', label: 'Registered Onboarded', icon: Target, color: '#3B82F6' },
@@ -22,14 +23,10 @@ const analyticsApi = {
     if (params.metric) searchParams.append('metric', params.metric);
     if (params.weeks) searchParams.append('weeks', params.weeks);
     
-    const response = await fetch(`/api/analytics/best-month?${searchParams}`);
-    if (!response.ok) throw new Error('Failed to fetch best month analysis');
-    return response.json();
+    return secureApiClient.get(`/analytics/best-month?${searchParams}`);
   },
   getAllNotes: async () => {
-    const response = await fetch('/api/notes');
-    if (!response.ok) throw new Error('Failed to fetch notes');
-    return response.json();
+    return secureApiClient.get('/notes');
   }
 };
 

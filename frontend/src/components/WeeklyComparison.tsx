@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Calendar, TrendingUp, Activity, Eye, Filter } from 'lucide-react';
 import Card from './Card';
+import secureApiClient from '../utils/secure-api-client';
 
 const METRICS = [
   { key: 'registered_onboarded', label: 'Registered Onboarded', color: '#3B82F6' },
@@ -25,9 +26,7 @@ const analyticsApi = {
     if (params.month) searchParams.append('month', params.month);
     if (params.metric) searchParams.append('metric', params.metric);
     
-    const response = await fetch(`/api/analytics/weekly-comparison?${searchParams}`);
-    if (!response.ok) throw new Error('Failed to fetch weekly comparison');
-    return response.json();
+    return secureApiClient.get(`/analytics/weekly-comparison?${searchParams}`);
   },
   getAllNotes: async () => {
     const response = await fetch('/api/notes');

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import secureApiClient from '../utils/secure-api-client';
 import { 
   TrendingUp, 
   AlertTriangle, 
@@ -53,9 +54,7 @@ const analyticsApi = {
     if (params.weeks) searchParams.append('weeks', params.weeks);
     if (params.months) searchParams.append('months', params.months);
     
-    const response = await fetch(`/api/analytics/strategy-advisor?${searchParams}`);
-    if (!response.ok) throw new Error('Failed to fetch strategy advisor data');
-    return response.json();
+    return secureApiClient.get(`/analytics/strategy-advisor?${searchParams}`);
   }
 };
 

@@ -4,6 +4,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { TrendingUp, Calendar, Users, CreditCard, Target, ArrowUp, ArrowDown, Minus } from 'lucide-react';
 import Card from './Card';
 import { useClient } from '../contexts/ClientContext';
+import secureApiClient from '../utils/secure-api-client';
 
 const METRICS = [
   { key: 'registered_onboarded', label: 'Registered Onboarded', icon: Users, color: '#3B82F6' },
@@ -25,9 +26,7 @@ const analyticsApi = {
     if (params.maxDays) searchParams.append('maxDays', params.maxDays);
     searchParams.append('clientId', clientId);
     
-    const response = await fetch(`/api/analytics/monthly-comparison?${searchParams}`);
-    if (!response.ok) throw new Error('Failed to fetch monthly comparison');
-    return response.json();
+    return secureApiClient.get(`/analytics/monthly-comparison?${searchParams}`);
   },
   getMonthlyComparisonAllMetrics: async (params: any, clientId: string) => {
     // Fetch data for all metrics to populate the cards
@@ -41,11 +40,8 @@ const analyticsApi = {
       searchParams.append('clientId', clientId);
       
       try {
-        const response = await fetch(`/api/analytics/monthly-comparison?${searchParams}`);
-        if (response.ok) {
-          const data = await response.json();
-          allMetricsData[metric.key] = data;
-        }
+        const data = await secureApiClient.get(`/analytics/monthly-comparison?${searchParams}`);
+        allMetricsData[metric.key] = data;
       } catch (error) {
         console.warn(`Failed to fetch data for ${metric.key}:`, error);
         allMetricsData[metric.key] = { rows: [] };
