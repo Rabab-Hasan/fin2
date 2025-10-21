@@ -50,11 +50,11 @@ const initializeDatabase = async () => {
 
 // Routes
 app.use('/api', require('./routes/import'));
-app.use('/api/reports', require('./routes/reports'));
+app.use('/api/reports', require('./routes/reports-mongo'));  // Use MongoDB for reports
 app.use('/api/columns', require('./routes/columns'));
 app.use('/api/export', require('./routes/export'));
 app.use('/api/backup', require('./routes/backup'));
-app.use('/api/analytics', require('./routes/analytics'));
+app.use('/api/analytics', require('./routes/analytics-mongo'));  // Use MongoDB for analytics
 app.use('/api/notes', require('./routes/notes'));
 
 // Initialize media routes after other setup
@@ -64,8 +64,8 @@ app.use('/api/media', mediaRoutes);
 // Initialize tasks routes
 app.use('/api/tasks', require('./routes/tasks'));
 
-// Initialize clients routes
-app.use('/api/clients', require('./routes/clients'));
+// Initialize clients routes - Use MongoDB version
+app.use('/api/clients', require('./routes/clients-mongo'));
 
 // Initialize auth routes
 app.use('/api/auth', require('./routes/auth'));
@@ -156,11 +156,21 @@ app.listen(PORT, '0.0.0.0', async () => {
     console.warn('⚠️  Encryption validation failed - check configuration');
   }
   
-  // Initialize SQLite database
+  // Initialize MongoDB database
   try {
-    console.log('📊 Using SQLite database for development');
+    const mongoDb = require('./database-mongo');
+    console.log('📊 Using MongoDB Atlas for production data');
+    await mongoDb.connect();
+    
+    // Initialize sample data if needed
+    const initMongoData = require('../init-mongo-data');
+    await initMongoData();
+    
+    console.log('✅ MongoDB initialized with sample data');
+    console.log('🔒 Sensitive data will be encrypted automatically');
+    
+    // Also initialize local database for migrations
     await initializeDatabase();
-    console.log('� Sensitive data will be encrypted automatically');
     
   } catch (error) {
     console.error('❌ Error with database setup:', error);
