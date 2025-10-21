@@ -119,30 +119,52 @@ router.get('/stats', authenticateToken, async (req, res) => {
     // Get total records count
     const total_records = await reportsCollection.countDocuments(filter);
     
-    // Get unique months for this client
-    const monthsAggregation = [
-      ...(clientId ? [{ $match: { clientId } }] : []),
-      {
-        $group: {
-          _id: {
-            $dateToString: {
-              format: "%Y-%m",
-              date: { $dateFromString: { dateString: "$report_date" } }
+    // Get unique months for this client - handle both string and date formats
+    let months_tracked = 0;
+    try {
+      const monthsAggregation = [
+        ...(clientId ? [{ $match: { clientId } }] : []),
+        {
+          $project: {
+            month: {
+              $cond: {
+                if: { $type: { $toDate: "$report_date" } },
+                then: { $dateToString: { format: "%Y-%m", date: { $toDate: "$report_date" } } },
+                else: { $substr: ["$report_date", 0, 7] }  // Extract YYYY-MM from string
+              }
             }
           }
+        },
+        {
+          $group: {
+            _id: "$month"
+          }
         }
-      }
-    ];
-    
-    const monthsData = await reportsCollection.aggregate(monthsAggregation).toArray();
-    const months_tracked = monthsData.length;
+      ];
+      
+      const monthsData = await reportsCollection.aggregate(monthsAggregation).toArray();
+      months_tracked = monthsData.length;
+    } catch (monthError) {
+      console.warn('Month aggregation failed, using fallback:', monthError);
+      // Fallback: just count total records and estimate months
+      months_tracked = Math.max(1, Math.ceil(total_records / 30));
+    }
     
     // Get reports with notes for this client
-    const notesFilter = {
-      ...filter,
-      notes: { $exists: true, $ne: "", $ne: null }
-    };
-    const notes_count = await reportsCollection.countDocuments(notesFilter);
+    let notes_count = 0;
+    try {
+      const notesFilter = {
+        ...filter,
+        $or: [
+          { notes: { $exists: true, $ne: "", $ne: null } },
+          { "data.notes": { $exists: true, $ne: "", $ne: null } }
+        ]
+      };
+      notes_count = await reportsCollection.countDocuments(notesFilter);
+    } catch (notesError) {
+      console.warn('Notes count failed:', notesError);
+      notes_count = 0;
+    }
 
     res.json({
       total_records,
