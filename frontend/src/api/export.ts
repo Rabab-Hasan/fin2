@@ -1,8 +1,11 @@
-const API_BASE = '/api';
+import secureApiClient from '../utils/secure-api-client.js';
+
+const API_BASE = process.env.REACT_APP_API_URL || 'https://fin2-4.onrender.com';
 
 export const exportApi = {
-  // Export all data as CSV
+  // Export all data as CSV - return authenticated URL
   exportCsv: (): string => {
-    return `${API_BASE}/export/csv`;
+    const token = secureApiClient.getAuthToken();
+    return `${API_BASE}/api/export/csv${token ? `?token=${token}` : ''}`;
   },
 };

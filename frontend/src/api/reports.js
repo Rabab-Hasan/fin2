@@ -1,33 +1,19 @@
-const API_BASE_URL = (process.env.REACT_APP_API_URL || 'https://fin2-4.onrender.com') + '/api';
+import secureApiClient from '../utils/secure-api-client.js';
 
 export const reportsApi = {
   async getReports(clientId) {
-    const response = await fetch(`${API_BASE_URL}/reports?clientId=${clientId}`);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch reports: ${response.statusText}`);
-    }
-    return response.json();
+    return secureApiClient.get(`/reports?clientId=${clientId}`);
+  },
+
+  async getStats(clientId) {
+    return secureApiClient.get(`/reports/stats?clientId=${clientId}`);
   },
 
   async getReportNotes(reportDate) {
-    const response = await fetch(`${API_BASE_URL}/reports/${reportDate}/notes`);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch report notes: ${response.statusText}`);
-    }
-    return response.json();
+    return secureApiClient.get(`/reports/${reportDate}/notes`);
   },
 
   async updateReportNotes(reportDate, notes) {
-    const response = await fetch(`${API_BASE_URL}/reports/${reportDate}/notes`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ notes }),
-    });
-    if (!response.ok) {
-      throw new Error(`Failed to update report notes: ${response.statusText}`);
-    }
-    return response.json();
+    return secureApiClient.put(`/reports/${reportDate}/notes`, { notes });
   },
 };
