@@ -38,6 +38,9 @@ interface WeekdayData {
 const WeekdayPerformanceTable: React.FC = () => {
   const [selectedWeekday, setSelectedWeekday] = useState<string>('all');
 
+  // Check authentication status
+  console.log('🔐 Auth Token Check:', secureApiClient.getAuthToken() ? 'Token exists' : 'No token found');
+
   // Fetch weekday performance data
   const { data: weekdayData, isLoading, error } = useQuery({
     queryKey: ['weekday-performance', selectedWeekday],
@@ -47,8 +50,39 @@ const WeekdayPerformanceTable: React.FC = () => {
         params.append('weekday', selectedWeekday);
       }
       
-      return secureApiClient.get(`/api/analytics/weekday-performance?${params}`);
-    }
+      console.log('=== WEEKDAY PERFORMANCE DEBUG START ===');
+      console.log('� Selected Weekday:', selectedWeekday);
+      console.log('🔧 Params string:', params.toString());
+      console.log('🔧 Full URL:', `/api/analytics/weekday-performance?${params}`);
+      console.log('🔧 About to call secureApiClient...');
+      
+      try {
+        const result = await secureApiClient.get(`/api/analytics/weekday-performance?${params}`);
+        console.log('✅ SUCCESS - Response received');
+        console.log('✅ Response type:', typeof result);
+        console.log('✅ Response is array?', Array.isArray(result));
+        console.log('✅ Response first 500 chars:', JSON.stringify(result).substring(0, 500));
+        console.log('✅ Full response:', result);
+        console.log('=== WEEKDAY PERFORMANCE DEBUG END ===');
+        return result;
+      } catch (error) {
+        console.log('❌ ERROR OCCURRED');
+        console.error('❌ Error object:', error);
+        console.error('❌ Error type:', typeof error);
+        console.error('❌ Error message:', error?.message);
+        console.error('❌ Error name:', error?.name);
+        console.error('❌ Error stack:', error?.stack);
+        if (error?.response) {
+          console.error('❌ Error response:', error.response);
+          console.error('❌ Error response status:', error.response?.status);
+          console.error('❌ Error response data:', error.response?.data);
+        }
+        console.log('=== WEEKDAY PERFORMANCE DEBUG END (ERROR) ===');
+        throw error;
+      }
+    },
+    retry: 1,
+    retryDelay: 1000
   });
 
   // Helper function to find best and worst values for each metric
