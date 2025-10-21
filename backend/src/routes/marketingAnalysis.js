@@ -6,6 +6,27 @@ const MarketingAnalyzer = require('../services/marketingAnalyzer');
 
 const router = express.Router();
 
+// Authentication middleware
+const jwt = require('jsonwebtoken');
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-here';
+
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ error: 'Access token required' });
+  }
+
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) {
+      return res.status(403).json({ error: 'Invalid or expired token' });
+    }
+    req.user = user;
+    next();
+  });
+}
+
 // Configure multer for file uploads
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -40,7 +61,7 @@ const upload = multer({
  * Upload and analyze marketing CSV file
  * POST /api/marketing-analysis/upload-and-analyze
  */
-router.post('/upload-and-analyze', upload.single('csvFile'), async (req, res) => {
+router.post('/upload-and-analyze', authenticateToken, upload.single('csvFile'), async (req, res) => {
   try {
     console.log('📤 Marketing file upload and analysis request received');
 
@@ -101,7 +122,7 @@ router.post('/upload-and-analyze', upload.single('csvFile'), async (req, res) =>
  * Analyze existing CSV file by file path
  * POST /api/marketing-analysis/analyze-file
  */
-router.post('/analyze-file', async (req, res) => {
+router.post('/analyze-file', authenticateToken, async (req, res) => {
   try {
     const { filePath } = req.body;
 
@@ -247,7 +268,7 @@ router.get('/sample-structure', (req, res) => {
  * Validate CSV file structure before analysis
  * POST /api/marketing-analysis/validate-file
  */
-router.post('/validate-file', upload.single('csvFile'), async (req, res) => {
+router.post('/validate-file', authenticateToken, upload.single('csvFile'), async (req, res) => {
   try {
     console.log('🔍 Validating CSV file structure...');
 
