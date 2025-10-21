@@ -26,9 +26,9 @@ const processImportData = async (data, clientId) => {
 
     return {
       success: true,
-      message: `Successfully imported ${counters.savedCount} records`,
-      inserted: counters.savedCount,
-      updated: 0,
+      message: `Successfully processed ${counters.savedCount} records: ${counters.insertedCount || 0} inserted, ${counters.updatedCount || 0} updated`,
+      inserted: counters.insertedCount || 0,
+      updated: counters.updatedCount || 0,
       skipped: counters.errorCount,
       new_columns: [],
       errors: counters.errors.slice(0, 10).map((error, index) => ({ row: index + 1, reason: error }))
@@ -225,16 +225,19 @@ const processMongoDBImport = async (data, counters, clientId) => {
   const db = await getDb();
   const reportsCollection = db.collection('reports');
   
+  let insertedCount = 0;
+  let updatedCount = 0;
+  
   for (let i = 0; i < data.length; i++) {
     try {
       const row = data[i];
       
       // Handle both possible date field names
-      const reportDate = row.reportDate || row.report_date;
+      const reportDate = row.reportDate || row.report_date || row.date;
       
       // Validate required fields
       if (!reportDate) {
-        counters.errors.push(`Row ${i + 1}: Missing reportDate/report_date`);
+        counters.errors.push(`Row ${i + 1}: Missing reportDate/report_date/date`);
         counters.errorCount++;
         continue;
       }
@@ -247,33 +250,61 @@ const processMongoDBImport = async (data, counters, clientId) => {
         continue;
       }
 
-      // Map Excel column names to database document
-      const document = {
-        client_id: clientId,
-        report_date: dateObj.toISOString().split('T')[0],
-        month_label: row.month_label || '',
-        registered_onboarded: parseInt(row.registeredOnboarded || row.registered_onboarded) || 0,
-        subscription_completion: parseInt(row.subscriptionCompletion || row.subscription_completion) || 0,
-        trial_started: parseInt(row.trialStarted || row.trial_started) || 0,
-        subscription_started: parseInt(row.subscriptionStarted || row.subscription_started) || 0,
-        total_revenue: parseFloat(row.totalRevenue || row.total_revenue) || 0.0,
-        conversion_rate: parseFloat(row.conversionRate || row.conversion_rate) || 0.0,
-        campaign_performance: parseFloat(row.campaignPerformance || row.campaign_performance) || 0.0,
-        customer_acquisition_cost: parseFloat(row.customerAcquisitionCost || row.customer_acquisition_cost) || 0.0,
-        lifetime_value: parseFloat(row.lifetimeValue || row.lifetime_value) || 0.0,
-        churn_rate: parseFloat(row.churnRate || row.churn_rate) || 0.0,
-        net_promoter_score: parseFloat(row.netPromoterScore || row.net_promoter_score) || 0.0,
-        notes: row.notes || '',
-        created_at: new Date(),
-        updated_at: new Date()
+      // Convert date to string format consistently
+      const reportDateString = dateObj.toISOString().split('T')[0]; // YYYY-MM-DD format
+
+      // Check if record already exists for this client and date
+      const existingRecord = await reportsCollection.findOne({
+        clientId: clientId,
+        report_date: reportDateString
+      });
+
+      // Map Excel column names to database document with proper data structure
+      const documentData = {
+        registered_onboarded: parseInt(row.registeredOnboarded || row.registered_onboarded || row['Registered Onboarded']) || 0,
+        linked_accounts: parseInt(row.linkedAccounts || row.linked_accounts || row['Linked Accounts']) || 0,
+        total_advance_applications: parseInt(row.totalAdvanceApplications || row.total_advance_applications || row['Total Advance Applications']) || 0,
+        total_advance_applicants: parseInt(row.totalAdvanceApplicants || row.total_advance_applicants || row['Total Advance Applicants']) || 0,
+        total_micro_financing_applications: parseInt(row.totalMicroFinancingApplications || row.total_micro_financing_applications || row['Total Micro Financing Applications']) || 0,
+        total_micro_financing_applicants: parseInt(row.totalMicroFinancingApplicants || row.total_micro_financing_applicants || row['Total Micro Financing Applicants']) || 0,
+        total_personal_finance_application: parseInt(row.totalPersonalFinanceApplication || row.total_personal_finance_application || row['Total Personal Finance Applications']) || 0,
+        total_personal_finance_applicants: parseInt(row.totalPersonalFinanceApplicants || row.total_personal_finance_applicants || row['Total Personal Finance Applicants']) || 0,
+        total_bnpl_applications: parseInt(row.totalBnplApplications || row.total_bnpl_applications || row['Total BNPL Applications']) || 0,
+        total_bnpl_applicants: parseInt(row.totalBnplApplicants || row.total_bnpl_applicants || row['Total BNPL Applicants']) || 0
       };
 
-      // Insert or update the document
-      await reportsCollection.replaceOne(
-        { client_id: clientId, report_date: document.report_date },
-        document,
-        { upsert: true }
-      );
+      if (existingRecord) {
+        // Update existing record
+        await reportsCollection.updateOne(
+          { clientId: clientId, report_date: reportDateString },
+          {
+            $set: {
+              month_label: row.month_label || row['Month Label'] || '',
+              data: documentData,
+              notes: row.notes || row.Notes || '',
+              updatedAt: new Date()
+            }
+          }
+        );
+        updatedCount++;
+        console.log(`Updated record for date: ${reportDateString}`);
+      } else {
+        // Insert new record
+        const newDocument = {
+          id: `import_${Date.now()}_${i}`, // Generate unique ID
+          clientId: clientId,
+          report_date: reportDateString,
+          month_label: row.month_label || row['Month Label'] || '',
+          data: documentData,
+          notes: row.notes || row.Notes || '',
+          createdAt: new Date(),
+          updatedAt: new Date()
+        };
+
+        await reportsCollection.insertOne(newDocument);
+        insertedCount++;
+        console.log(`Inserted new record for date: ${reportDateString}`);
+      }
       
       counters.savedCount++;
       
@@ -283,6 +314,12 @@ const processMongoDBImport = async (data, counters, clientId) => {
       counters.errorCount++;
     }
   }
+
+  // Update counters to reflect actual inserts vs updates
+  counters.insertedCount = insertedCount;
+  counters.updatedCount = updatedCount;
+  
+  console.log(`Import completed: ${insertedCount} inserted, ${updatedCount} updated`);
 };
 
 module.exports = {
