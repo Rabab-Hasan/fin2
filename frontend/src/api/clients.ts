@@ -1,4 +1,4 @@
-const BASE_URL = '/api/clients';
+const BASE_URL = `${process.env.REACT_APP_API_URL || 'https://fin2-4.onrender.com'}/api/clients`;
 
 export interface Client {
   id: string;

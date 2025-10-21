@@ -1,4 +1,4 @@
-const BASE_URL = '/api/tasks';
+const BASE_URL = `${process.env.REACT_APP_API_URL || 'https://fin2-4.onrender.com'}/api/tasks`;
 
 export interface Task {
   id: string;

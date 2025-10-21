@@ -1,4 +1,6 @@
 // API functions for media management
+const API_BASE = process.env.REACT_APP_API_URL || 'https://fin2-4.onrender.com';
+
 const mediaApi = {
   // Get all media assets
   getAssets: async (filters = {}) => {
@@ -7,14 +9,14 @@ const mediaApi = {
     if (filters.search) searchParams.append('search', filters.search);
     if (filters.status) searchParams.append('status', filters.status);
     
-    const response = await fetch(`/api/media?${searchParams}`);
+    const response = await fetch(`${API_BASE}/api/media?${searchParams}`);
     if (!response.ok) throw new Error('Failed to fetch media assets');
     return response.json();
   },
 
   // Get specific asset
   getAsset: async (id) => {
-    const response = await fetch(`/api/media/${id}`);
+    const response = await fetch(`${API_BASE}/api/media/${id}`);
     if (!response.ok) throw new Error('Failed to fetch media asset');
     return response.json();
   },
@@ -28,7 +30,7 @@ const mediaApi = {
     formData.append('description', metadata.description);
     formData.append('status', metadata.status || 'active');
 
-    const response = await fetch('/api/media/upload', {
+    const response = await fetch(`${API_BASE}/api/media/upload`, {
       method: 'POST',
       body: formData,
     });
@@ -63,7 +65,7 @@ const mediaApi = {
 
   // Get asset statistics
   getStats: async () => {
-    const response = await fetch('/api/media/stats/overview');
+    const response = await fetch(`${API_BASE}/api/media/stats/overview`);
     if (!response.ok) throw new Error('Failed to fetch stats');
     return response.json();
   }

@@ -1,15 +1,17 @@
 // API functions for roadmap management
+const API_BASE = process.env.REACT_APP_API_URL || 'https://fin2-4.onrender.com';
+
 const roadmapApi = {
   // Get all roadmap assets
   getAssets: async (clientId) => {
-    const response = await fetch(`/api/roadmap/assets?clientId=${clientId}`);
+    const response = await fetch(`${API_BASE}/api/roadmap/assets?clientId=${clientId}`);
     if (!response.ok) throw new Error('Failed to fetch roadmap assets');
     return response.json();
   },
 
   // Create new asset
   createAsset: async (asset) => {
-    const response = await fetch('/api/roadmap/assets', {
+    const response = await fetch(`${API_BASE}/api/roadmap/assets`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -14,6 +14,8 @@ import {
 } from 'lucide-react';
 import { useClient } from '../contexts/ClientContext';
 
+const API_BASE = process.env.REACT_APP_API_URL || 'https://fin2-4.onrender.com';
+
 interface Record {
   report_date: string;
   registered_onboarded: number;
@@ -43,7 +45,7 @@ const SimpleDataManager: React.FC = () => {
       if (!selectedClient?.id) return [];
       
       console.log('Fetching records for client:', selectedClient.id);
-      const response = await fetch(`/api/reports?clientId=${selectedClient.id}&limit=1000`);
+      const response = await fetch(`${API_BASE}/api/reports?clientId=${selectedClient.id}&limit=1000`);
       
       if (!response.ok) {
         const errorText = await response.text();
@@ -66,7 +68,7 @@ const SimpleDataManager: React.FC = () => {
     queryFn: async () => {
       if (!selectedClient?.id) return {};
       
-      const response = await fetch(`/api/reports/stats?clientId=${selectedClient.id}`);
+      const response = await fetch(`${API_BASE}/api/reports/stats?clientId=${selectedClient.id}`);
       if (!response.ok) throw new Error('Failed to fetch stats');
       return response.json();
     },
@@ -76,7 +78,7 @@ const SimpleDataManager: React.FC = () => {
   // Update note mutation
   const updateNoteMutation = useMutation({
     mutationFn: async ({ date, notes }: { date: string; notes: string }) => {
-      const response = await fetch(`/api/reports/${date}/notes`, {
+      const response = await fetch(`${API_BASE}/api/reports/${date}/notes`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ notes, clientId: selectedClient?.id }),
@@ -103,7 +105,7 @@ const SimpleDataManager: React.FC = () => {
     formData.append('clientId', selectedClient.id);
 
     try {
-      const response = await fetch('/api/import', {
+      const response = await fetch(`${API_BASE}/api/import`, {
         method: 'POST',
         body: formData,
       });
