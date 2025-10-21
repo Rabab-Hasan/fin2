@@ -19,6 +19,7 @@ import {
   Calendar,
   Filter
 } from 'lucide-react';
+import secureApiClient from '../utils/secure-api-client';
 
 interface AnalysisResults {
   summary: {
@@ -185,12 +186,7 @@ const MarketingAnalysis: React.FC = () => {
       const formData = new FormData();
       formData.append('csvFile', file);
 
-      const response = await fetch('/api/marketing-analysis/validate-file', {
-        method: 'POST',
-        body: formData,
-      });
-
-      const data = await response.json();
+      const data = await secureApiClient.postFormData('/api/marketing-analysis/validate-file', formData);
 
       if (data.success) {
         setValidationResults(data.validation);
@@ -218,12 +214,7 @@ const MarketingAnalysis: React.FC = () => {
 
       console.log('🚀 Starting marketing analysis for:', file.name);
 
-      const response = await fetch('/api/marketing-analysis/upload-and-analyze', {
-        method: 'POST',
-        body: formData,
-      });
-
-      const data = await response.json();
+      const data = await secureApiClient.postFormData('/api/marketing-analysis/upload-and-analyze', formData);
 
       if (data.success) {
         setResults(data.analysis);

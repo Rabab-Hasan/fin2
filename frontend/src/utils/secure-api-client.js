@@ -166,6 +166,48 @@ class SecureApiClient {
     });
   }
 
+  // POST request with FormData (for file uploads)
+  async postFormData(endpoint, formData, options = {}) {
+    try {
+      const url = `${this.baseURL}${endpoint}`;
+      const headers = {};
+      
+      const token = this.getAuthToken();
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      // Don't set Content-Type for FormData, let browser set it with boundary
+      const config = {
+        method: 'POST',
+        body: formData,
+        headers,
+        ...options,
+      };
+
+      const response = await fetch(url, config);
+      
+      if (!response.ok) {
+        const contentType = response.headers.get('content-type');
+        const errorData = contentType?.includes('application/json') 
+          ? await response.json() 
+          : { error: `HTTP ${response.status}`, message: await response.text() };
+        
+        throw new Error(errorData.error || errorData.message || 'Request failed');
+      }
+
+      const contentType = response.headers.get('content-type');
+      if (contentType?.includes('application/json')) {
+        return await response.json();
+      }
+      
+      return response;
+    } catch (error) {
+      console.error(`FormData request failed for ${endpoint}:`, error);
+      throw error;
+    }
+  }
+
   // Login with encrypted credentials
   async login(email, password) {
     try {
