@@ -175,13 +175,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   // Debug logging for authentication state
-  console.log('🔍 AuthContext: Current state:', {
+  const authState = {
     hasUser: !!user,
     hasToken: !!token,
     isAuthenticated: !!user && !!token,
     userEmail: user?.email,
     isLoading
-  });
+  };
+  
+  console.log('🔍 AuthContext: Current state:', authState);
+  
+  // Force logout if user exists but no token (inconsistent state)
+  if (user && !token && !isLoading) {
+    console.warn('🚨 AuthContext: Inconsistent state detected - user without token, forcing logout');
+    logout();
+  }
 
   return (
     <AuthContext.Provider value={value}>

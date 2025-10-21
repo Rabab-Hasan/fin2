@@ -9,8 +9,7 @@
     "migrate": "node src/migrations/run.js",
     "init-data": "node init-mongo-data.js",
     "test-db": "node test-db.js",
-    "postinstall": "npm rebuild sqlite3",
-    "build": "npm rebuild sqlite3 && echo 'Backend build completed'",
+    "build": "echo 'Backend build completed'",
     "production": "NODE_ENV=production node src/server.js"
   },
   "dependencies": {
