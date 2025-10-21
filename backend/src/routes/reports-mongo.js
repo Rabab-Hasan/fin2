@@ -5,8 +5,29 @@ const { getDb } = require('../database-mongo');
 
 const router = express.Router();
 
+// Authentication middleware
+const jwt = require('jsonwebtoken');
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-here';
+
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ error: 'Access token required' });
+  }
+
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) {
+      return res.status(403).json({ error: 'Invalid or expired token' });
+    }
+    req.user = user;
+    next();
+  });
+}
+
 // POST /api/reports - Create or update a single report
-router.post('/', async (req, res) => {
+router.post('/', authenticateToken, async (req, res) => {
   try {
     const { report_date, month_label, data, clientId } = req.body;
     
@@ -83,7 +104,7 @@ router.post('/', async (req, res) => {
 });
 
 // GET /api/reports/stats - Get dashboard statistics
-router.get('/stats', async (req, res) => {
+router.get('/stats', authenticateToken, async (req, res) => {
   try {
     const { clientId } = req.query;
     
@@ -135,7 +156,7 @@ router.get('/stats', async (req, res) => {
 });
 
 // GET /api/reports - Get all reports with optional filtering
-router.get('/', async (req, res) => {
+router.get('/', authenticateToken, async (req, res) => {
   try {
     const { clientId, month, year, startDate, endDate } = req.query;
     
@@ -195,7 +216,7 @@ router.get('/', async (req, res) => {
 });
 
 // GET /api/reports/:id - Get a specific report
-router.get('/:id', async (req, res) => {
+router.get('/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     

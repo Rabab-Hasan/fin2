@@ -13,6 +13,7 @@ import {
   X
 } from 'lucide-react';
 import { useClient } from '../contexts/ClientContext';
+import secureApiClient from '../utils/secure-api-client';
 
 const API_BASE = process.env.REACT_APP_API_URL || 'https://fin2-4.onrender.com';
 
@@ -45,15 +46,7 @@ const SimpleDataManager: React.FC = () => {
       if (!selectedClient?.id) return [];
       
       console.log('Fetching records for client:', selectedClient.id);
-      const response = await fetch(`${API_BASE}/api/reports?clientId=${selectedClient.id}&limit=1000`);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('API Error Response:', errorText);
-        throw new Error(`Failed to fetch records: ${response.status} ${errorText}`);
-      }
-      
-      const data = await response.json();
+      const data = await secureApiClient.get(`/api/reports?clientId=${selectedClient.id}&limit=1000`);
       console.log('Received records:', data);
       return data;
     },
@@ -68,9 +61,7 @@ const SimpleDataManager: React.FC = () => {
     queryFn: async () => {
       if (!selectedClient?.id) return {};
       
-      const response = await fetch(`${API_BASE}/api/reports/stats?clientId=${selectedClient.id}`);
-      if (!response.ok) throw new Error('Failed to fetch stats');
-      return response.json();
+      return await secureApiClient.get(`/api/reports/stats?clientId=${selectedClient.id}`);
     },
     enabled: !!selectedClient?.id,
   });
@@ -78,13 +69,10 @@ const SimpleDataManager: React.FC = () => {
   // Update note mutation
   const updateNoteMutation = useMutation({
     mutationFn: async ({ date, notes }: { date: string; notes: string }) => {
-      const response = await fetch(`${API_BASE}/api/reports/${date}/notes`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ notes, clientId: selectedClient?.id }),
+      return await secureApiClient.patch(`/api/reports/${date}/notes`, { 
+        notes, 
+        clientId: selectedClient?.id 
       });
-      if (!response.ok) throw new Error('Failed to update note');
-      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['records', selectedClient?.id] });
@@ -105,8 +93,17 @@ const SimpleDataManager: React.FC = () => {
     formData.append('clientId', selectedClient.id);
 
     try {
+      // Get auth token for the import request
+      const token = secureApiClient.getAuthToken();
+      if (!token) {
+        throw new Error('No authentication token found. Please login again.');
+      }
+
       const response = await fetch(`${API_BASE}/api/import`, {
         method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
         body: formData,
       });
 

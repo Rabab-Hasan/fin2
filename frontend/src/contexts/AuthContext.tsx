@@ -187,8 +187,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   
   // Force logout if user exists but no token (inconsistent state)
   if (user && !token && !isLoading) {
-    console.warn('🚨 AuthContext: Inconsistent state detected - user without token, forcing logout');
-    logout();
+    console.error('🚨 AuthContext: CRITICAL - user without token detected, forcing complete logout');
+    
+    // Immediate state clearing
+    setUser(null);
+    setToken(null);
+    setAccessInfo(null);
+    
+    // Clear all storage immediately
+    clientEncryption.clearUserData();
+    localStorage.clear();
+    sessionStorage.clear();
+    
+    // Force page reload to reset all state
+    console.error('🚨 AuthContext: Forcing page reload to clear all state');
+    window.location.reload();
   }
 
   return (
