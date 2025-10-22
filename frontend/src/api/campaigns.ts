@@ -1,5 +1,4 @@
-// Campaign API client
-const API_BASE = '/api';
+import secureApiClient from '../utils/secure-api-client.js';
 
 export interface Campaign {
   id: string;
@@ -50,66 +49,35 @@ export interface UpdateCampaignData extends Partial<CreateCampaignData> {
   status?: 'draft' | 'active' | 'paused' | 'completed';
 }
 
-class CampaignsApi {
-  private async request(endpoint: string, options?: RequestInit) {
-    const url = `${API_BASE}${endpoint}`;
-    
-    const response = await fetch(url, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options?.headers,
-      },
-      ...options,
-    });
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Unknown error' }));
-      throw new Error(error.error || `HTTP ${response.status}: ${response.statusText}`);
-    }
-
-    return response.json();
-  }
-
+export const campaignsApi = {
   async getCampaigns(params: { clientId: string }) {
     const searchParams = new URLSearchParams({ client_id: params.clientId });
-    return this.request(`/campaigns?${searchParams}`);
-  }
+    return secureApiClient.get(`/campaigns?${searchParams}`);
+  },
 
   async getCampaign(id: string, clientId: string) {
-    return this.request(`/campaigns/${id}?clientId=${clientId}`);
-  }
+    return secureApiClient.get(`/campaigns/${id}?clientId=${clientId}`);
+  },
 
   async createCampaign(data: CreateCampaignData) {
-    return this.request('/campaigns', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  }
+    return secureApiClient.post('/campaigns', data);
+  },
 
   async updateCampaign(id: string, data: UpdateCampaignData) {
-    return this.request(`/campaigns/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-  }
+    return secureApiClient.put(`/campaigns/${id}`, data);
+  },
 
   async deleteCampaign(id: string, clientId: string) {
-    return this.request(`/campaigns/${id}?clientId=${clientId}`, {
-      method: 'DELETE',
-    });
-  }
+    return secureApiClient.delete(`/campaigns/${id}?clientId=${clientId}`);
+  },
 
   async validateCampaign(id: string, clientId: string) {
-    return this.request(`/campaigns/${id}/validate`, {
-      method: 'POST',
-      body: JSON.stringify({ clientId }),
-    });
-  }
+    return secureApiClient.post(`/campaigns/${id}/validate`, { clientId });
+  },
 
   async getCampaignTasks(campaignId: string, clientId: string) {
-    return this.request(`/campaigns/${campaignId}/tasks?client_id=${clientId}`);
+    return secureApiClient.get(`/campaigns/${campaignId}/tasks?client_id=${clientId}`);
   }
-}
+};
 
-const campaignsApi = new CampaignsApi();
 export default campaignsApi;

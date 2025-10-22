@@ -203,8 +203,6 @@ const WeeklyComparison: React.FC = () => {
   const overallDailyAvg = allDayTotals.length ? allDayTotals.reduce((sum, val) => sum + val, 0) / allDayTotals.length : 0;
 
   const formatValue = (value: number) => {
-    if (value >= 1000000) return (value / 1000000).toFixed(1) + 'M';
-    if (value >= 1000) return (value / 1000).toFixed(1) + 'K';
     return value.toLocaleString();
   };
 
