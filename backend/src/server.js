@@ -71,6 +71,15 @@ app.use('/api/clients', require('./routes/clients-mongo'));
 // Initialize auth routes
 app.use('/api/auth', require('./routes/auth'));
 
+// Initialize roles management routes
+app.use('/api/roles', require('./routes/roles'));
+
+// Initialize leave management routes
+app.use('/api/leave', require('./routes/leave'));
+
+// Initialize chat routes
+app.use('/api/chat', require('./routes/chat'));
+
 // Initialize TikTok integration routes
 app.use('/api/tiktok', require('./routes/tiktok'));
 
