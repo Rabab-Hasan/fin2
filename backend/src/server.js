@@ -68,6 +68,9 @@ app.use('/api/tasks', require('./routes/tasks'));
 // Initialize clients routes - Use MongoDB version
 app.use('/api/clients', require('./routes/clients-mongo'));
 
+// Initialize client requests routes
+app.use('/api/clients/requests', require('./routes/clientRequests-mongo'));
+
 // Initialize auth routes
 app.use('/api/auth', require('./routes/auth'));
 
@@ -104,8 +107,8 @@ app.use('/api/marketing-analysis', require('./routes/marketingAnalysis'));
 // Initialize campaign performance routes
 app.use('/api/campaign-performance', require('./routes/campaign-performance'));
 
-// Initialize notifications routes
-app.use('/api/notifications', require('./routes/notifications'));
+// Initialize notifications routes - Use MongoDB version
+app.use('/api/notifications', require('../routes/notifications-mongo'));
 
 // Initialize KNIME integration routes (chatbot fallback)
 app.use('/api/knime', require('./routes/knime'));
