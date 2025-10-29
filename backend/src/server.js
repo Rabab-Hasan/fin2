@@ -80,6 +80,10 @@ app.use('/api/roles', require('./routes/roles'));
 // Initialize leave management routes
 app.use('/api/leave', require('./routes/leave'));
 
+// Initialize equipment management routes
+app.use('/api/equipment-inventory', require('./routes/equipment-inventory'));
+app.use('/api/equipment-requests', require('./routes/equipment-requests'));
+
 // Initialize chat routes
 app.use('/api/chat', require('./routes/chat'));
 
