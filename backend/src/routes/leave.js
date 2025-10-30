@@ -163,16 +163,23 @@ router.post('/holidays', authenticateToken, async (req, res) => {
       return res.status(403).json({ error: 'Access denied - Admin privileges required' });
     }
 
-    const { name, date, recurring } = req.body;
+    const { name, date, end_date, recurring } = req.body;
 
-    if (!name || !date) {
+    // Validate required fields
+    if (!name || !name.trim() || !date) {
       return res.status(400).json({ error: 'Name and date are required' });
+    }
+
+    // Validate dates
+    if (end_date && new Date(end_date) < new Date(date)) {
+      return res.status(400).json({ error: 'End date cannot be before start date' });
     }
 
     const db = await getDb();
     const holiday = {
       name: name.trim(),
       date: date,
+      end_date: end_date || null,
       recurring: Boolean(recurring),
       created_at: getCurrentDate()
     };
