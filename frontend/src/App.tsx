@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import NavBar from './components/NavBar';
 import Home from './pages/Home';
 import BusinessDataNew from './pages/BusinessDataNew';
-import Labs from './pages/Labs';
+// Labs component removed
 import ProjectOverviewPage from './pages/ProjectOverviewPage';
 import AccessPage from './pages/AccessPage';
 import CampaignSetup from './pages/CampaignSetup';
@@ -70,11 +70,7 @@ function App() {
                         <AccessPage />
                       </RouteProtector>
                     } />
-                    <Route path="/labs" element={
-                      <RouteProtector allowedRoutes={[]}>
-                        <Labs />
-                      </RouteProtector>
-                    } />
+                    {/* Labs route removed */}
                     <Route path="/gfh-test" element={
                       <RouteProtector allowedRoutes={[]}>
                         <GFHTestValidation />

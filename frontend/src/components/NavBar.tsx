@@ -22,7 +22,7 @@ const NavBar: React.FC = () => {
     { path: '/access', label: 'Access', icon: User },
   ];
 
-  const labsNavItem = { path: '/labs', label: 'Action Labs', icon: FlaskConical };
+  // Labs navigation removed
 
   // Build navigation items based on user type
   let navItems = [];
@@ -41,7 +41,7 @@ const NavBar: React.FC = () => {
           user?.user_type === 'admin' || 
           user?.user_type === 'employee' || 
           !user?.user_type ? adminNavItems : []),
-      labsNavItem,
+      // Labs navigation removed
     ];
   }
 
