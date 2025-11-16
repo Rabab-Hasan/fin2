@@ -158,11 +158,20 @@ app.use('*', (req, res) => {
   res.status(404).json({ error: 'Endpoint not found' });
 });
 
+// Create HTTP server for WebSocket support
+const http = require('http');
+const server = http.createServer(app);
+
+// Initialize WebSocket signaling for calls
+const CallSignalingServer = require('./services/call-signaling');
+CallSignalingServer.create(server);
+
 // Start server
-app.listen(PORT, '0.0.0.0', async () => {
+server.listen(PORT, '0.0.0.0', async () => {
   console.log(`🚀 Finance Dashboard Backend running on port ${PORT}`);
   console.log(`🏥 Health check: http://localhost:${PORT}/api/health`);
   console.log(`🌐 Network access: http://192.168.100.137:${PORT}/api/health`);
+  console.log(`📞 WebSocket calls available at: ws://localhost:${PORT}/ws/calls`);
   
   // Validate encryption setup
   console.log('🔒 Validating encryption system...');
