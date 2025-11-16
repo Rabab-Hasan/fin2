@@ -84,8 +84,9 @@ router.get('/', authenticateToken, async (req, res) => {
     const { page = 1, limit = 20, unreadOnly = false } = req.query;
     const skip = (page - 1) * limit;
 
-    // Build query
-    const query = { userId: new ObjectId(req.user.id) };
+    // Build query - use userId, _id, or id from token
+    const userId = req.user.userId || req.user._id || req.user.id;
+    const query = { userId: new ObjectId(userId) };
     if (unreadOnly === 'true') {
       query.read = false;
     }
@@ -103,7 +104,7 @@ router.get('/', authenticateToken, async (req, res) => {
     
     // Get unread count
     const unreadCount = await notifications.countDocuments({
-      userId: new ObjectId(req.user.id),
+      userId: new ObjectId(userId),
       read: false
     });
 
@@ -130,8 +131,9 @@ router.get('/count', authenticateToken, async (req, res) => {
     const db = await connectToMongoDB();
     const notifications = db.collection('notifications');
     
+    const userId = req.user.userId || req.user._id || req.user.id;
     const unreadCount = await notifications.countDocuments({
-      userId: new ObjectId(req.user.id),
+      userId: new ObjectId(userId),
       read: false
     });
 
@@ -157,10 +159,11 @@ router.patch('/:id/read', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Invalid notification ID' });
     }
 
+    const userId = req.user.userId || req.user._id || req.user.id;
     const result = await notifications.updateOne(
       { 
         _id: new ObjectId(id),
-        userId: new ObjectId(req.user.id)
+        userId: new ObjectId(userId)
       },
       {
         $set: {
@@ -190,9 +193,10 @@ router.patch('/read-all', authenticateToken, async (req, res) => {
     const db = await connectToMongoDB();
     const notifications = db.collection('notifications');
     
+    const userId = req.user.userId || req.user._id || req.user.id;
     const result = await notifications.updateMany(
       { 
-        userId: new ObjectId(req.user.id),
+        userId: new ObjectId(userId),
         read: false
       },
       {
@@ -225,9 +229,10 @@ router.delete('/:id', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Invalid notification ID' });
     }
 
+    const userId = req.user.userId || req.user._id || req.user.id;
     const result = await notifications.deleteOne({
       _id: new ObjectId(id),
-      userId: new ObjectId(req.user.id)
+      userId: new ObjectId(userId)
     });
 
     if (result.deletedCount === 0) {
@@ -250,8 +255,9 @@ router.delete('/', authenticateToken, async (req, res) => {
     const db = await connectToMongoDB();
     const notifications = db.collection('notifications');
     
+    const userId = req.user.userId || req.user._id || req.user.id;
     const result = await notifications.deleteMany({
-      userId: new ObjectId(req.user.id)
+      userId: new ObjectId(userId)
     });
 
     res.json({
