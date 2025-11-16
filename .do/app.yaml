@@ -33,7 +33,7 @@ services:
     value: your-api-secret-here
     type: SECRET
   - key: MONGODB_URI
-    value: mongodb+srv://rhasan:GlassDoor2025@cluster0.tj04exd.mongodb.net/genius_db?retryWrites=true&w=majority&appName=Cluster0
+    value: mongodb+srv://rababhasan:T7Gf4mP2QqBrnbT@cluster0.tj04exd.mongodb.net/genius_db?retryWrites=true&w=majority&appName=Cluster0
 
 - name: frontend
   source_dir: /frontend
