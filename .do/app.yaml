@@ -4,9 +4,9 @@
 name: finance-dashboard
 services:
 - name: backend
-  source_dir: /backend
+  source_dir: /
   github:
-    repo: Rabab-Hasan/fin2
+    repo: Rabab-Hasan/back
     branch: main
   run_command: npm start
   build_command: npm install && npm rebuild sqlite3
