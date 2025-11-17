@@ -217,7 +217,10 @@ class CallSignalingServer {
     const { callId } = data;
     const call = this.activeCalls.get(callId);
     
-    if (!call) return;
+    if (!call) {
+      console.warn('❌ Call not found for signaling relay:', callId);
+      return;
+    }
 
     // Determine target (relay to the other party)
     const targetUserId = ws.userId === call.callerId ? call.receiverId : call.callerId;
@@ -225,6 +228,9 @@ class CallSignalingServer {
     
     if (targetWs && targetWs.readyState === WebSocket.OPEN) {
       targetWs.send(JSON.stringify(message));
+      console.log(`📞 Relayed ${message.type} from ${ws.userId} to ${targetUserId}`);
+    } else {
+      console.warn('❌ Target user not available for signaling:', targetUserId);
     }
   }
 
