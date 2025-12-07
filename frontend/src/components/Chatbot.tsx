@@ -17,17 +17,11 @@ interface ChatbotProps {
 const Chatbot: React.FC<ChatbotProps> = ({ isVisible = false, onToggle }) => {
   const [isOpen, setIsOpen] = useState(true);
   const [isMinimized, setIsMinimized] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      text: 'Hi! I am your AI Campaign Assistant powered by Llama 3.2.\n\nI can help you with:\n• Campaign strategy and timing\n• Budget allocation across platforms\n• Platform selection (Instagram, TikTok, etc.)\n• Performance optimization\n• Geographic targeting\n• Creative strategy\n\nI will give you real, conversational responses - not generic templates. Ask me anything about your campaigns!',
-      sender: 'bot',
-      timestamp: new Date()
-    }
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [aiProvider, setAiProvider] = useState<'ollama' | 'knime' | 'h2o' | 'fallback'>('ollama');
+  const [isInitialized, setIsInitialized] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -85,38 +79,112 @@ const Chatbot: React.FC<ChatbotProps> = ({ isVisible = false, onToggle }) => {
     }
   }, [isOpen, isMinimized]);
 
-  // Ollama Local AI integration (REAL AI that actually works!)
-  const callOllamaAI = async (prompt: string): Promise<string> => {
+  // Initialize with AI-generated welcome message
+  useEffect(() => {
+    if (!isInitialized && isOpen) {
+      generateWelcomeMessage();
+      setIsInitialized(true);
+    }
+  }, [isOpen, isInitialized]);
+
+  const generateWelcomeMessage = async () => {
     try {
-      console.log('🦙 Calling Ollama Local AI...');
+      console.log('🧠 Generating AI welcome message...');
+      
       const response = await fetch('http://localhost:11434/api/generate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'llama3.2:3b',
-          prompt: `You are a smart marketing campaign assistant. You help with campaign planning, budget allocation, platform selection, and marketing strategy. Be conversational, helpful, and specific.
+          model: 'gpt-oss:20b',
+          prompt: `SYSTEM: Generate a sharp, intelligent welcome message for Rabab Hasan (Admin). You are an advanced AI business intelligence engine powered by Ollama models running locally.
 
-User: ${prompt}
-Assistant:`,
+CONTEXT: 
+- User: Rabab Hasan (Admin access to all systems)
+- Current State: 8 team members, 3 clients, clean project slate
+- Your Capabilities: Strategic analysis, pattern recognition, business intelligence, predictive insights
+- Technology: Ollama local LLM with full database integration
+
+REQUIREMENTS:
+- Sound genuinely intelligent, not generic
+- Demonstrate business acumen and strategic thinking
+- Be concise (2-3 sentences max)
+- Show awareness of their business context
+- Prove you're a real AI, not a template system
+
+Generate a strategic, intelligent welcome that showcases analytical capabilities:`,
           stream: false,
           options: {
-            temperature: 0.7,
-            top_p: 0.9,
-            max_tokens: 400
+            temperature: 0.9,
+            num_predict: 300,
+            top_k: 40,
+            top_p: 0.85
           }
         })
       });
 
-      if (!response.ok) {
-        throw new Error(`Ollama API error: ${response.status}`);
+      if (response.ok) {
+        const data = await response.json();
+        const welcomeMessage: Message = {
+          id: 'welcome',
+          text: data.response,
+          sender: 'bot',
+          timestamp: new Date()
+        };
+        setMessages([welcomeMessage]);
+        console.log('✅ AI welcome message generated');
+      } else {
+        throw new Error('Failed to generate welcome message');
       }
-
-      const data = await response.json();
-      return data.response || 'I apologize, but I could not process that request properly.';
     } catch (error) {
-      console.error('Ollama AI error:', error);
+      console.error('❌ Failed to generate AI welcome message:', error);
+      // Fallback to a simple message
+      const fallbackMessage: Message = {
+        id: 'welcome-fallback',
+        text: 'Hello! I\'m your intelligent business assistant powered by local AI. I can help you with tasks, analytics, client information, and business insights. What would you like to know?',
+        sender: 'bot',
+        timestamp: new Date()
+      };
+      setMessages([fallbackMessage]);
+    }
+  };
+
+  // Intelligent AI Processor integration with Local LLM
+  const callIntelligentAI = async (prompt: string): Promise<string> => {
+    try {
+      console.log('� Using Intelligent AI Processor with Local LLM...');
+      
+      // Import the intelligent AI processor
+      const { intelligentAIProcessor } = await import('../services/IntelligentAIProcessor');
+      
+      const queryContext = {
+        userMessage: prompt,
+        conversationHistory: messages.slice(-5).map(msg => ({
+          role: msg.sender as 'user' | 'assistant',
+          content: msg.text
+        })),
+        preferences: {
+          responseLength: 'medium' as const,
+          technicalLevel: 'intermediate' as const,
+          includeExamples: true
+        }
+      };
+
+      // Mock user for testing (in real app, this would come from auth context)
+      const mockUser = {
+        id: '1',
+        name: 'Campaign User',
+        email: 'user@example.com',
+        user_type: 'admin'
+      };
+
+      const response = await intelligentAIProcessor.processIntelligentQuery(queryContext, mockUser);
+      
+      console.log(`✅ Intelligent AI response (${response.method}, confidence: ${Math.round(response.confidence * 100)}%)`);
+      return response.response;
+    } catch (error) {
+      console.error('Intelligent AI error:', error);
       throw error;
     }
   };
@@ -253,21 +321,122 @@ Assistant:`,
     try {
       let botResponse = '';
       
-      // Try Ollama Local AI first (primary AI provider - ACTUALLY WORKS!)
+      // Try Direct Ollama API first (bypassing template system)
       if (aiProvider === 'ollama') {
         try {
-          console.log('🦙 Using Ollama Local AI for real conversation...');
-          botResponse = await callOllamaAI(inputText);
-          console.log('✅ Ollama AI response received');
+          console.log('🦙 Using Direct Ollama Local LLM...');
+          
+          // Determine which model to use based on query complexity
+          const isComplexQuery = inputText.length > 100 || 
+            inputText.toLowerCase().includes('analyze') || 
+            inputText.toLowerCase().includes('strategy') ||
+            inputText.toLowerCase().includes('insights') ||
+            inputText.toLowerCase().includes('recommend');
+          
+          const modelToUse = isComplexQuery ? 'gpt-oss:20b' : 'llama3.2:latest';
+          
+          console.log(`Using ${modelToUse} for ${isComplexQuery ? 'complex' : 'simple'} query`);
+          
+          const response = await fetch('http://localhost:11434/api/generate', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: modelToUse,
+              prompt: `SYSTEM: You are an advanced AI business intelligence engine with deep analytical capabilities and strategic thinking. You operate locally via Ollama models and have comprehensive access to live business data.
+
+INTELLIGENCE CORE:
+- Model: ${modelToUse} (Local Ollama LLM)
+- Access Level: Full business intelligence database
+- Analytical Depth: Strategic, tactical, and operational insights
+- Response Style: Sharp, insightful, data-driven
+
+CURRENT BUSINESS STATE:
+• Team Analytics: 8 professionals with diverse skill sets
+• Client Portfolio: 3 active relationships requiring strategic attention  
+• Project Pipeline: Currently at baseline - prime opportunity for new initiatives
+• System Status: All departments accessible, real-time data streaming
+
+USER PROFILE: Rabab Hasan | Admin Role | Full System Access
+
+INTELLIGENCE DIRECTIVES:
+1. Analyze patterns, not just report data
+2. Identify strategic opportunities and risks
+3. Provide actionable insights with specific next steps
+4. Connect business relationships and dependencies
+5. Think like a business strategist, not a generic assistant
+6. Be concise but profound - every word should add value
+7. Anticipate business needs and suggest proactive measures
+
+ANALYTICAL CONTEXT: When users ask basic questions like "what are you" or "what can you do":
+- Explain your actual AI capabilities and intelligence
+- Demonstrate analytical thinking in your response
+- Show business understanding, not generic assistant features
+- Prove you understand their business context
+
+USER QUERY: "${inputText}"
+
+STRATEGIC RESPONSE: Analyze and respond with genuine business intelligence:`,
+              stream: false,
+              options: {
+                temperature: 0.8,
+                num_predict: isComplexQuery ? 800 : 400,
+                top_k: 40,
+                top_p: 0.9
+              }
+            })
+          });
+
+          if (!response.ok) {
+            throw new Error(`Ollama API error: ${response.status}`);
+          }
+
+          const data = await response.json();
+          botResponse = data.response || 'I understand your question, but I need more specific information to provide a helpful answer.';
+          
+          console.log('✅ Direct Ollama response received from', modelToUse);
         } catch (error) {
-          console.error('❌ Ollama AI failed:', error);
-          console.log('🔄 Trying KNIME Analytics backup...');
-          setAiProvider('knime');
+          console.error('❌ Direct Ollama failed:', error);
+          // Try simpler model if complex model fails
+          if (modelToUse === 'gpt-oss:20b') {
+            try {
+              console.log('🔄 Trying simpler Llama model...');
+              const fallbackResponse = await fetch('http://localhost:11434/api/generate', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  model: 'llama3.2:latest',
+                  prompt: `You are an intelligent business assistant. The user ${inputText}. Give a real AI response, not a template.`,
+                  stream: false,
+                  options: {
+                    temperature: 0.8,
+                    num_predict: 300
+                  }
+                })
+              });
+              
+              if (fallbackResponse.ok) {
+                const fallbackData = await fallbackResponse.json();
+                botResponse = fallbackData.response;
+                console.log('✅ Fallback Llama model succeeded');
+              } else {
+                throw new Error('Both models failed');
+              }
+            } catch (fallbackError) {
+              console.error('❌ Both Ollama models failed:', fallbackError);
+              botResponse = "I'm sorry, I'm having trouble connecting to my AI models right now. Please make sure Ollama is running with the models installed.";
+            }
+          } else {
+            botResponse = "I'm sorry, I'm having trouble connecting to my AI models right now. Please make sure Ollama is running.";
+          }
         }
       }
       
-      // Try KNIME Analytics Platform as backup
-      if (!botResponse && aiProvider === 'knime') {
+      // Only use Ollama - no other systems
+      if (false) {
         try {
           console.log('🔬 Executing KNIME Analytics workflow...');
           console.log('Query:', inputText);
@@ -333,13 +502,10 @@ Assistant:`,
         }
       }
       
-      // Use enhanced fallback responses if all AI providers failed
+      // Final safety check - ensure we have a response
       if (!botResponse) {
-        console.log('🧠 All AI providers failed, using enhanced local analytics engine');
-        console.log('Current AI Provider:', aiProvider);
-        botResponse = getFallbackResponse(inputText);
-        
-        // No debug messages in user responses
+        console.log('🚨 All AI systems failed - this should not happen');
+        botResponse = "I apologize, but I'm having technical difficulties connecting to my AI systems. Please ensure Ollama is running and the models are properly installed. You can test with: curl -X POST http://localhost:11434/api/generate -d '{\"model\":\"llama3.2\",\"prompt\":\"test\",\"stream\":false}'";
       }
 
       // Remove typing indicator and add actual response
@@ -354,13 +520,13 @@ Assistant:`,
       });
 
     } catch (error) {
-      // Remove typing indicator and show fallback
-      const fallbackResponse = getFallbackResponse(inputText);
+      console.error('❌ Critical AI system failure:', error);
+      // Remove typing indicator and show error message
       setMessages(prev => {
         const withoutTyping = prev.filter(msg => !msg.isTyping);
         return [...withoutTyping, {
           id: Date.now().toString(),
-          text: fallbackResponse,
+          text: "I'm experiencing technical difficulties. Please ensure Ollama is running locally on port 11434 with the required models installed.",
           sender: 'bot',
           timestamp: new Date()
         }];
@@ -419,7 +585,7 @@ Assistant:`,
           <div>
             <h3 className="font-semibold text-sm">Campaign Assistant</h3>
             <p className="text-xs opacity-90">
-              Powered by {aiProvider === 'ollama' ? 'Ollama Local AI' : aiProvider === 'knime' ? 'KNIME Analytics' : aiProvider === 'h2o' ? 'H2O.ai Backup' : 'Advanced Analytics'}
+              Powered by {aiProvider === 'ollama' ? 'Advanced Local AI + Business Intelligence' : aiProvider === 'knime' ? 'KNIME Analytics' : aiProvider === 'h2o' ? 'H2O.ai Backup' : 'Advanced Analytics'}
             </p>
           </div>
         </div>

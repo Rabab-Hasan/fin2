@@ -117,6 +117,9 @@ app.use('/api/notifications', require('../routes/notifications-mongo'));
 // Initialize KNIME integration routes (chatbot fallback)
 app.use('/api/knime', require('./routes/knime'));
 
+// Initialize AI assistant routes (Ollama integration)
+app.use('/api/ai', require('./routes/ai'));
+
 // Health check with encryption status
 app.get('/api/health', async (req, res) => {
   try {

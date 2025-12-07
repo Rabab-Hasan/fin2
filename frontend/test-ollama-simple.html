@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ollama AI Test</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            margin: 0;
+            font-size: 2.5em;
+            font-weight: 300;
+        }
+        
+        .test-section {
+            padding: 40px;
+        }
+        
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
+            font-size: 16px;
+            box-sizing: border-box;
+            min-height: 100px;
+        }
+        
+        .test-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 10px;
+        }
+        
+        .test-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .response-section {
+            background: #f8fafc;
+            border-radius: 15px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        
+        .response-text {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+            white-space: pre-wrap;
+            line-height: 1.6;
+        }
+        
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #e5e7eb;
+            border-top: 2px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .error {
+            background: #fef2f2;
+            color: #dc2626;
+            padding: 15px;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🦙 Ollama AI Test</h1>
+            <p>Testing Local LLM Integration</p>
+        </div>
+        
+        <div class="test-section">
+            <form id="testForm">
+                <textarea 
+                    id="query" 
+                    placeholder="Ask me anything about business, tasks, analytics..."
+                    required
+                >What are the top 3 priorities for improving business productivity?</textarea>
+                
+                <button type="submit" class="test-button" id="testButton">
+                    🚀 Test Ollama
+                </button>
+            </form>
+            
+            <div class="response-section" id="responseSection" style="display: none;">
+                <h3>🤖 AI Response:</h3>
+                <div class="response-text" id="responseText"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('testForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const query = document.getElementById('query').value;
+            const button = document.getElementById('testButton');
+            const responseSection = document.getElementById('responseSection');
+            const responseText = document.getElementById('responseText');
+            
+            // Show loading
+            button.disabled = true;
+            button.innerHTML = '<div class="spinner"></div> Processing...';
+            
+            try {
+                console.log('Testing Ollama with query:', query);
+                
+                const response = await fetch('http://localhost:11434/api/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        model: query.length > 100 ? 'gpt-oss:20b' : 'llama3.2:latest',
+                        prompt: `You are an intelligent business assistant. ${query}`,
+                        stream: false,
+                        options: {
+                            temperature: 0.7,
+                            num_predict: query.length > 100 ? 800 : 400
+                        }
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                console.log('Ollama response:', data);
+                
+                responseText.textContent = data.response || 'No response received';
+                responseSection.style.display = 'block';
+                
+            } catch (error) {
+                console.error('Error:', error);
+                responseText.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+                responseSection.style.display = 'block';
+            } finally {
+                button.disabled = false;
+                button.innerHTML = '🚀 Test Ollama';
+            }
+        });
+    </script>
+</body>
+</html>
