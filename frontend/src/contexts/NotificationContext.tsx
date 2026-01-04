@@ -35,7 +35,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(false);
-  const { user } = useAuth();
+  const { user, token } = useAuth();
 
   // Get current user ID from AuthContext
   const getCurrentUserId = (): string | null => {
@@ -174,18 +174,23 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
 
   const deleteNotification = async (notificationId: number) => {
     const userId = getCurrentUserId();
-    if (!userId) return;
+    if (!userId || !token) {
+      console.log('Missing user ID or token for notification deletion');
+      return;
+    }
 
     try {
+      console.log('🗑️ Deleting notification:', notificationId);
       const response = await fetch(`/api/notifications/${notificationId}`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({ userId }),
       });
 
       if (response.ok) {
+        console.log('✅ Notification deleted successfully');
         // Remove from local state
         setNotifications(prev =>
           prev.filter(notification => notification.id !== notificationId)
@@ -193,6 +198,8 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
         
         // Refresh unread count
         await refreshUnreadCount();
+      } else {
+        console.error('❌ Failed to delete notification:', response.status, await response.text());
       }
     } catch (error) {
       console.error('Error deleting notification:', error);
